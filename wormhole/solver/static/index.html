@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>虫洞</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root{
+  --bg:#f8fafc;--surface:#fff;--s2:#f1f5f9;--border:#e2e8f0;--b2:#cbd5e1;
+  --text:#1e293b;--dim:#64748b;--d2:#94a3b8;
+  --blue:#3b82f6;--cyan:#0ea5e9;--green:#10b981;--red:#ef4444;
+  --amber:#f59e0b;--purple:#8b5cf6;--pink:#ec4899;
+  --shadow:0 1px 3px rgba(0,0,0,.05);
+  --sh:0 4px 16px rgba(0,0,0,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;
+  background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow);z-index:10}
+.brand{display:flex;align-items:center;gap:8px}
+.brand-icon{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+.brand-name{font-size:16px;font-weight:700}
+.tabs{display:flex;gap:2px;background:var(--s2);border-radius:8px;padding:3px}
+.tab{padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--dim);
+  border:none;background:none;transition:.15s}
+.tab.active{background:var(--surface);color:var(--blue);box-shadow:var(--shadow)}
+.tab:hover:not(.active){color:var(--text)}
+.hstats{display:flex;gap:16px}
+.hs{text-align:center}.hs-v{font-size:16px;font-weight:700}.hs-l{font-size:8px;color:var(--dim);text-transform:uppercase}
+.hbtns{display:flex;gap:6px}
+.btn{padding:6px 14px;border:1px solid var(--b2);border-radius:7px;background:var(--surface);color:var(--text);
+  cursor:pointer;font-size:12px;font-weight:500;transition:.15s}
+.btn:hover{border-color:var(--blue)}
+.btn-p{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn-d{background:#fee2e2;border-color:#fecaca;color:var(--red)}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* Layout */
+.wrap{display:flex;height:calc(100vh - 52px)}
+.side{width:240px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.main{flex:1;overflow-y:auto;padding:16px}
+
+/* Sidebar */
+.ss{padding:12px 16px;border-bottom:1px solid var(--border)}
+.ss h3{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.sss{display:flex;justify-content:space-around}
+.sss-v{font-size:18px;font-weight:800}.sss-l{font-size:8px;color:var(--dim);text-transform:uppercase}
+.cl{flex:1;overflow-y:auto}
+.ci{padding:6px 16px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;border-left:3px solid transparent;transition:.1s}
+.ci:hover{background:var(--s2)}.ci.act{background:rgba(59,130,246,.05);border-left-color:var(--blue)}
+.cd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cd.s{background:var(--green)}.cd.a{background:var(--amber);animation:p 1.5s infinite}.cd.i{background:var(--b2)}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.cc{flex:1;font-family:'SF Mono',monospace;font-size:11px}
+.cm{font-size:9px;color:var(--dim)}
+
+/* Panels */
+.pnl{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden}
+.ph{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.pt{font-size:12px;font-weight:600}
+.pb{font-size:10px;padding:2px 8px;border-radius:8px;background:var(--s2);color:var(--dim)}
+.pbody{padding:14px 16px}
+
+/* DAG */
+#dagBox{position:relative;border-radius:8px;overflow:hidden;background:#fafbfc}
+#dagCv{display:block}
+
+/* Timeline */
+.tl{position:relative;padding-left:20px}
+.tl::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:2px;background:var(--border)}
+.te{position:relative;padding:8px 0 8px 16px}
+.te::before{content:'';position:absolute;left:-17px;top:12px;width:8px;height:8px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--b2)}
+.te.bootstrap::before{border-color:var(--cyan);background:var(--cyan)}
+.te.orient::before{border-color:var(--purple)}
+.te.act::before{border-color:var(--green);background:var(--green)}
+.te.flag::before{border-color:var(--amber);background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.te.complete::before{border-color:var(--green);background:var(--green)}
+.te-phase{font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:2px}
+.te.bootstrap .te-phase{color:var(--cyan)}
+.te.orient .te-phase{color:var(--purple)}
+.te.act .te-phase{color:var(--green)}
+.te.flag .te-phase{color:var(--amber)}
+.te.complete .te-phase{color:var(--green)}
+.te-desc{font-size:12px;color:var(--text);line-height:1.5}
+.te-meta{font-size:10px;color:var(--d2);margin-top:2px}
+
+/* Log */
+#logBox{max-height:240px;overflow-y:auto;font-family:'SF Mono','Consolas',monospace;font-size:11px;line-height:1.6;
+  background:#fafbfc;border-radius:8px;padding:10px}
+.ll{padding:1px 0;word-break:break-word;opacity:0;animation:fi .3s forwards}
+@keyframes fi{to{opacity:1}}
+.lt{color:var(--d2);margin-right:6px}
+.ll.think .lm{color:var(--cyan)}.ll.fact .lm{color:var(--green)}
+.ll.flag .lm{color:var(--amber);font-weight:600}.ll.error .lm{color:var(--red)}
+.ll.status .lm{color:var(--purple)}.ll.explore .lm{color:var(--blue)}
+
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fc{padding:8px 10px;background:var(--s2);border-radius:7px;border-left:3px solid var(--purple);margin-bottom:5px;cursor:pointer;transition:.1s}
+.fc:hover{background:#e2e8f0;border-left-color:var(--blue)}
+.fc.new{animation:si .4s}
+@keyframes si{from{opacity:0;transform:translateX(-6px)}to{opacity:1}}
+.fi{font-family:monospace;font-size:10px;color:var(--blue);font-weight:700}
+.fd{font-size:11px;color:var(--dim);margin-top:2px;line-height:1.4;max-height:120px;overflow-y:auto;word-break:break-word;white-space:pre-wrap}
+.sc{padding:8px 10px;background:var(--s2);border-radius:7px;margin-bottom:5px;border-left:3px solid var(--green)}
+.st{font-size:11px;font-weight:600;color:var(--green)}
+.sd{font-size:11px;color:var(--dim);margin-top:2px;line-height:1.4;max-height:80px;overflow-y:auto;word-break:break-word;white-space:pre-wrap}
+.sm{font-size:9px;color:var(--d2);margin-top:3px}
+.eh{color:var(--d2);font-size:11px;padding:6px 0;text-align:center}
+
+/* Overview */
+.radar-box{display:flex;justify-content:center;padding:10px}
+.story-card{padding:12px;background:var(--s2);border-radius:8px;margin-bottom:8px;border-left:3px solid var(--green)}
+.story-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.story-code{font-family:monospace;font-weight:700;font-size:13px;color:var(--blue)}
+.story-flag{font-family:monospace;font-size:11px;color:var(--amber);font-weight:600}
+.story-step{font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px}
+.story-step:last-child{border:none}
+.story-act{font-size:9px;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--dim);white-space:nowrap}
+.story-find{color:var(--text);line-height:1.4;word-break:break-word;white-space:pre-wrap}
+
+/* Design philosophy */
+.phil-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.phil-card{padding:14px;background:var(--s2);border-radius:10px;border:1px solid var(--border)}
+.phil-card h4{font-size:13px;margin-bottom:6px;color:var(--blue)}
+.phil-card p{font-size:12px;color:var(--dim);line-height:1.6}
+.phil-card code{font-family:monospace;font-size:11px;background:var(--surface);padding:1px 4px;border-radius:3px;color:var(--purple)}
+
+/* Modal */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.25);backdrop-filter:blur(3px);display:none;
+  align-items:center;justify-content:center;z-index:100}
+.mbg.show{display:flex}
+.mdl{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:460px;max-width:92vw;box-shadow:var(--sh)}
+.mdl h2{font-size:16px;margin-bottom:16px}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:500}
+.fg input,.fg select{width:100%;padding:8px 12px;background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px}
+.fg input:focus{border-color:var(--blue);outline:none}
+.fr{display:flex;gap:10px}.fr .fg{flex:1}
+
+/* Drawer */
+.dd{position:fixed;top:52px;right:-320px;width:300px;height:calc(100vh - 52px);background:var(--surface);
+  border-left:1px solid var(--border);padding:16px;overflow-y:auto;transition:right .25s;z-index:50;box-shadow:var(--sh)}
+.dd.open{right:0}
+.dc{position:absolute;top:12px;right:12px;cursor:pointer;color:var(--dim);font-size:16px}
+.dd h3{font-size:13px;margin-bottom:10px;color:var(--blue)}
+.dr{padding:6px 0;border-bottom:1px solid var(--border)}
+.dk{font-size:10px;color:var(--dim);font-family:monospace}
+.dv{font-size:11px;color:var(--text);margin-top:2px;word-break:break-word;line-height:1.4}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="brand"><div class="brand-icon">W</div><span class="brand-name">虫洞</span></div>
+  <div class="tabs">
+    <button class="tab active" id="t1" onclick="sw('detail')">题目详情</button>
+    <button class="tab" id="t2" onclick="sw('overview')">总览控制台</button>
+  </div>
+  <div class="hstats">
+    <div class="hs"><div class="hs-v" id="hsv-s" style="color:var(--green)">0</div><div class="hs-l">Solved</div></div>
+    <div class="hs"><div class="hs-v" id="hsv-f" style="color:var(--amber)">0</div><div class="hs-l">Flags</div></div>
+    <div class="hs"><div class="hs-v" id="hsv-t" style="color:var(--d2)">0</div><div class="hs-l">Total</div></div>
+  </div>
+  <div class="hbtns">
+    <button class="btn" onclick="openCfg()">配置</button>
+    <button class="btn btn-p" id="bStart" onclick="start()">启动</button>
+    <button class="btn btn-d" id="bStop" onclick="stop()" disabled>停止</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="side">
+    <div class="ss"><h3>进度</h3><div class="sss">
+      <div class="sss-item"><div class="sss-v" id="sv-s" style="color:var(--green)">0</div><div class="sss-l">解出</div></div>
+      <div class="sss-item"><div class="sss-v" id="sv-a" style="color:var(--amber)">0</div><div class="sss-l">进行</div></div>
+      <div class="sss-item"><div class="sss-v" id="sv-i" style="color:var(--d2)">0</div><div class="sss-l">待跑</div></div>
+    </div></div>
+    <div class="cl" id="cList"><div class="eh" style="padding:16px">配置后启动</div></div>
+  </div>
+
+  <!-- Detail -->
+  <div class="main" id="vDetail">
+    <div class="pnl">
+      <div class="ph"><div class="pt" id="dagT">知识图谱</div><span class="pb" id="dagB">选择题目</span></div>
+      <div class="pbody" style="padding:10px"><div id="dagBox" style="position:relative;border-radius:8px;background:#fafbfc;overflow:hidden"><canvas id="dagCv"></canvas>
+        <div id="dagTT" style="position:absolute;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;max-width:280px;font-size:11px;z-index:5;box-shadow:var(--sh);pointer-events:none"></div></div></div>
+    </div>
+    <div class="pnl">
+      <div class="ph"><div class="pt">OODA 决策时间线</div><span class="pb" id="tlB">—</span></div>
+      <div class="pbody"><div class="tl" id="tlBox"><div class="eh">选择题目查看思维链</div></div></div>
+    </div>
+    <div class="pnl">
+      <div class="ph"><div class="pt">实时活动</div><span class="pb" id="wsB" style="color:var(--green)">在线</span></div>
+      <div class="pbody" style="padding:0"><div id="logBox"></div></div>
+    </div>
+    <div class="g2">
+      <div class="pnl"><div class="ph"><div class="pt">发现 (Facts)</div></div><div class="pbody" id="fList"><div class="eh">暂无</div></div></div>
+      <div class="pnl"><div class="ph"><div class="pt">已排除方向 (Dead Ends)</div><span class="pb" id="deB" style="color:var(--d2)">0</span></div><div class="pbody" id="deList"><div class="eh">暂无</div></div></div>
+      <div class="pnl"><div class="ph"><div class="pt">共享信息中心</div></div><div class="pbody" id="pList"><div class="eh">暂无</div></div></div>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <div class="main" id="vOver" style="display:none">
+    <div class="pnl">
+      <div class="ph"><div class="pt">能力分布</div><span class="pb" id="ovB">—</span></div>
+      <div class="pbody">
+        <div class="radar-box"><canvas id="radarCv" width="360" height="280"></canvas></div>
+        <div id="catStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="pnl">
+      <div class="ph"><div class="pt">Flag 发现故事</div><span class="pb" id="storyB">—</span></div>
+      <div class="pbody" id="storyList"><div class="eh">暂无解题记录</div></div>
+    </div>
+    <div class="pnl">
+      <div class="ph"><div class="pt">攻击面总览</div><span class="pb" id="ovDagB">—</span></div>
+      <div class="pbody" id="ovDagBox" style="padding:8px"><div class="eh">暂无数据</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="dd" id="drawer"><span class="dc" onclick="cD()">x</span><div id="dContent"></div></div>
+
+<div class="mbg" id="cfgModal">
+  <div class="mdl"><h2>运行配置</h2>
+    <div class="fg"><label>Base URL</label><input id="cUrl" placeholder="https://tsecbench.zc.tencent.com"></div>
+    <div class="fg"><label>Token</label><input id="cToken"></div>
+    <div class="fg"><label>LLM API Key</label><input id="cKey" type="password"></div>
+    <div class="fr">
+      <div class="fg"><label>模型</label><select id="cModel"><option value="glm-5.2">GLM-5.2</option><option value="deepseek-v4-pro">DeepSeek-V4-Pro</option><option value="deepseek-v4-flash">DeepSeek-V4-Flash</option></select></div>
+      <div class="fg"><label>LLM URL</label><input id="cLlmUrl"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>并发</label><input id="cConc" type="number" value="3" min="1" max="3"></div>
+      <div class="fg"><label>超时(秒)</label><input id="cTimeout" type="number" value="1200"></div>
+      <div class="fg"><label>轮数</label><input id="cRounds" type="number" value="15"></div>
+    </div>
+    <div class="fg"><label>难度</label><select id="cDiff"><option value="">全部</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" onclick="closeCfg()">取消</button><button class="btn btn-p" onclick="saveCfg()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ws=null,cur=null,timer=null,kf=new Set(),dsig='',tab='detail',ovsig='';
+// ── WS
+function cWS(){ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`);
+  ws.onopen=()=>{$('wsB').textContent='在线';$('wsB').style.color='var(--green)';};
+  ws.onclose=()=>{$('wsB').textContent='重连';$('wsB').style.color='var(--amber)';setTimeout(cWS,2000);};
+  ws.onmessage=e=>{const d=JSON.parse(e.data);hMsg(d);};}
+function hMsg(d){let m=d.msg||'',t=d.type||'log';
+  if(m.includes('flag{')||m.includes('accepted'))t='flag';
+  else if(m.includes('+fact')||m.includes('intent')&&m.includes('fact'))t='fact';
+  else if(m.includes('[round')||m.includes('explore')||m.includes('bootstrap')||m.includes('reason'))t='explore';
+  else if(m.includes('stagnation')||m.includes('infra_down')||m.includes('reset')||m.includes('hypothesis'))t='explore';
+  else if(m.includes('error')||m.includes('ERROR')||m.includes('abandon')||m.includes('failed'))t='error';
+  else if(m.includes('Solver')||m.includes('COMPLETE')||m.includes('LLM:'))t='status';
+  aLog(m,t);
+  const x=m.match(/^\[([a-z0-9]+-[a-z0-9]+)\]/);if(x&&x[1]!==cur)selC(x[1]);}
+function aLog(m,t){const b=$('logBox');const d=document.createElement('div');d.className=`ll ${t}`;
+  const tm=new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  d.innerHTML=`<span class="lt">${tm}</span><span class="lm">${esc(m)}</span>`;b.appendChild(d);
+  while(b.children.length>400)b.removeChild(b.firstChild);b.scrollTop=b.scrollHeight;}
+function esc(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function $(id){return document.getElementById(id);}
+
+// ── API
+async function api(p,m='GET',b=null){const o={method:m,headers:{'Content-Type':'application/json'}};if(b)o.body=JSON.stringify(b);return(await fetch(`/api/${p}`,o)).json();}
+async function start(){aLog('启动中...','status');const r=await api('start','POST');if(r.error){aLog('失败:'+r.error,'error');return;}$('bStart').disabled=true;$('bStop').disabled=false;startR();}
+async function stop(){await api('stop','POST');$('bStart').disabled=false;$('bStop').disabled=true;}
+
+// ── Config
+function openCfg(){$('cfgModal').classList.add('show');}
+function closeCfg(){$('cfgModal').classList.remove('show');}
+async function loadCfg(){const c=await api('config');
+  $('cUrl').value=c.base_url||'';$('cModel').value=c.anthropic_model||'glm-5.2';
+  $('cLlmUrl').value=c.anthropic_base_url||'';$('cConc').value=c.concurrency||3;
+  $('cTimeout').value=c.task_timeout||1200;$('cRounds').value=c.max_rounds||15;$('cDiff').value=c.difficulty||'';}
+async function saveCfg(){await api('config','POST',{base_url:gv('cUrl'),token:gv('cToken'),
+  anthropic_auth_token:gv('cKey'),anthropic_model:gv('cModel'),anthropic_base_url:gv('cLlmUrl'),
+  concurrency:parseInt(gv('cConc')),task_timeout:parseInt(gv('cTimeout')),
+  max_rounds:parseInt(gv('cRounds')),difficulty:gv('cDiff')});
+  closeCfg();aLog('配置已保存','status');loadLive();}
+function gv(id){return $(id).value.trim();}
+
+// ── Tabs
+function sw(t){tab=t;
+  ['t1','t2'].forEach((id,i)=>$(id).classList.toggle('active',['detail','overview'][i]===t));
+  $('vDetail').style.display=t==='detail'?'':'none';
+  $('vOver').style.display=t==='overview'?'':'none';
+  if(t==='overview')loadOV();
+}
+
+// ── Live
+async function loadLive(){const d=await api('live');
+  $('hsv-s').textContent=d.total_solved||0;$('hsv-f').textContent=d.total_flags||0;$('hsv-t').textContent=d.challenges?.length||0;
+  const sv=d.challenges?.filter(c=>c.status==='solved').length||0;
+  const ac=d.challenges?.filter(c=>c.status==='active').length||0;
+  const id=d.challenges?.filter(c=>c.status==='idle').length||0;
+  const sk=d.challenges?.filter(c=>c.status==='stuck'||c.status==='failed').length||0;
+  $('sv-s').textContent=sv;$('sv-a').textContent=ac;$('sv-i').textContent=id;
+  if(sk){$('sv-sk')&&($('sv-sk').textContent=sk);}
+  renderList(d.challenges||[]);}
+function renderList(cs){const l=$('cList');
+  if(l.children.length!==cs.length+(cs.length?0:1)){l.innerHTML='';
+    if(!cs.length){l.innerHTML='<div class="eh" style="padding:16px">暂无题目</div>';return;}
+    for(const c of cs){const e=document.createElement('div');e.className='ci';e.dataset.code=c.code;e.onclick=()=>selC(c.code);l.appendChild(e);}}
+  for(const c of cs){const e=l.querySelector(`[data-code="${c.code}"]`);if(!e)continue;
+    const st=c.status;
+    const cl=st==='solved'?'s':(st==='active'?'a':(st==='stuck'?'sk':(st==='failed'?'fl':'i')));
+    const co=st==='solved'?'var(--green)':(st==='active'?'var(--amber)':(st==='stuck'?'var(--red, #e74c3c)':(st==='failed'?'var(--d2)':'var(--b2)')));
+    const lbl=c.flags>0?c.flags+'f':(st==='stuck'?'卡住':(st==='failed'?'失败':''));
+    e.innerHTML=`<span class="cd ${cl}" style="background:${co}"></span><span class="cc">${c.code}</span><span class="cm">${lbl}</span>`;
+    e.classList.toggle('act',c.code===cur);}}
+function selC(code){cur=code;
+  document.querySelectorAll('.ci').forEach(e=>e.classList.toggle('act',e.dataset.code===code));
+  kf.clear();dsig='';
+  $('fList').innerHTML='<div class="eh">加载中...</div>';$('pList').innerHTML='<div class="eh">加载中...</div>';
+  refreshBB();refreshTL();}
+
+// ── Blackboard + Timeline
+async function refreshBB(){if(!cur)return;
+  const bb=await api(`blackboard/${cur}`);
+  $('dagT').textContent=`知识图谱 — ${cur}`;
+  $('dagB').textContent=`${bb.facts.length}f / ${bb.intents.length}i${bb.completed?' / done':''}`;
+  // Facts: accumulate
+  const fd=$('fList');
+  for(const f of bb.facts){if(kf.has(f.id))continue;kf.add(f.id);
+    if(kf.size===1)fd.innerHTML='';
+    const c=document.createElement('div');c.className='fc new';c.onclick=()=>sD(f.id,'FACT',f,null);
+    c.innerHTML=`<div class="fi">${f.id}</div><div class="fd">${esc(f.description)}</div>`;
+    fd.appendChild(c);}
+  // Shared info center
+  const pd=$('pList');const act=bb.intents.filter(i=>i.worker&&!i.to);
+  const useful=bb.facts.filter(f=>f.id!=='origin'&&f.id!=='goal'&&f.description.length>20);
+  let h='';
+  if(act.length)h+=act.map(i=>`<div class="sc" style="border-left-color:var(--amber)"><div class="st" style="color:var(--amber)">${i.worker} — 探索中</div><div class="sd">${esc(i.direction)}</div></div>`).join('');
+  if(useful.length)h+=useful.slice(-6).reverse().map(f=>`<div class="sc"><div class="st">${f.id}</div><div class="sd">${esc(f.description)}</div><div class="sm">已验证 / 可复用</div></div>`).join('');
+  pd.innerHTML=h||'<div class="eh">暂无共享信息</div>';
+  // Dead ends panel
+  const de=bb.dead_ends||[];
+  $('deB').textContent=de.length;
+  const dd=$('deList');
+  dd.innerHTML=de.length?de.map(f=>`<div class="fc" style="opacity:0.7"><div class="fi" style="color:var(--red,#e74c3c)">${f.id}</div><div class="fd">${esc(f.description)}</div></div>`).join(''):'<div class="eh">暂无排除记录</div>';
+  // DAG
+  const sig=`${bb.facts.length}:${bb.intents.length}:${bb.completed?1:0}`;
+  if(sig!==dsig){dsig=sig;drawDAG(bb);}}
+
+async function refreshTL(){if(!cur)return;
+  const d=await api(`timeline/${cur}`);
+  $('tlB').textContent=`${d.events.length} steps`;
+  const box=$('tlBox');
+  if(!d.events.length){box.innerHTML='<div class="eh">暂无决策记录</div>';return;}
+  box.innerHTML=d.events.map(e=>`<div class="te ${e.phase}">
+    <div class="te-phase">${e.phase} · ${e.type}</div>
+    <div class="te-desc">${esc(e.desc||'')}</div>
+    ${e.worker?`<div class="te-meta">worker: ${e.worker}</div>`:''}
+    ${e.based_on?`<div class="te-meta">based on: ${e.based_on.length} prior facts</div>`:''}
+  </div>`).join('');}
+
+// ── DAG
+function drawDAG(bb){const cont=$('dagBox'),cv=$('dagCv'),ctx=cv.getContext('2d'),tt=$('dagTT');
+  const W=Math.max(cont.clientWidth||600,400),H=320;cv.width=W;cv.height=H;
+  if(!bb.facts.length){ctx.fillStyle='#94a3b8';ctx.font='13px Inter';ctx.textAlign='center';ctx.fillText('暂无数据',W/2,H/2);return;}
+  $('dagT').textContent=`知识图谱 — ${cur||''}`;
+  $('dagB').textContent=`${bb.facts.length}f / ${bb.intents.length}i${bb.completed?' / ✓':''}`;
+
+  // Extract a short keyword summary from a fact description
+  function kw(desc){
+    if(!desc)return '';
+    const kws=[
+      ['LFI','(LFI|path traversal|traversal|穿越)'],['SSRF','(SSRF|proxy\.php|tunnel\.php|fetch.*url)'],
+      ['SQLi','(SQL.injection|injectable|SQLi)'],['RCE','(RCE|command exec|remote code)'],
+      ['XSS','XSS'],['XXE','XXE'],['SSTI','(SSTI|template inject)'],
+      ['JWT','(JWT|token forge|kid )'],['upload','(upload|webshell)'],
+      ['Redis','Redis'],['MySQL','MySQL'],['cred','(credential|password|密码|凭据)'],
+      ['WAF bypass','(WAF|bypass)'],['CVE','CVE-\\d'],
+      ['Heartbleed','heartbeat'],['sandbox','(sandbox|vm2|escape)'],
+      ['polyglot','polyglot'],['DNS','DNS tunnel'],['flag','flag\\{'],
+      ['mass assign','mass assignment'],['deserializ','deserializ'],
+    ];
+    const found=[];
+    for(const[label,re]of kws){if(new RegExp(re,'i').test(desc))found.push(label);}
+    return found.slice(0,3);
+  }
+  // Short text from description (first meaningful phrase)
+  function shortDesc(desc,max){
+    if(!desc)return '';
+    let s=desc.replace(/^CTF challenge.*?\. /i,'').replace(/^Capture the flag.*$/i,'').trim();
+    s=s.replace(/\s+/g,' ').replace(/^(Intent |Explore )/i,'');
+    // Try first sentence or clause
+    const cut=s.match(/^(.{10,max}?[。，;,\n.])/);
+    if(cut)s=cut[1];
+    return s.length>max?s.substring(0,max)+'…':s;
+  }
+
+  // Build nodes
+  const nm={};
+  for(const f of bb.facts){
+    const isFlag=f.description.includes('flag{');
+    const type=f.id==='origin'?'origin':(f.id==='goal'?'goal':(isFlag?'flag':'fact'));
+    const keywords=kw(f.description);
+    nm[f.id]={id:f.id,desc:f.description,type,
+      label:f.id==='origin'?'origin':(f.id==='goal'?'goal':f.id),
+      keywords,short:shortDesc(f.description,45)};
+  }
+  for(const it of bb.intents)if(!it.to&&!nm[it.id])
+    nm[it.id]={id:it.id,desc:it.description,type:'intent',
+      label:it.id,keywords:kw(it.description),short:shortDesc(it.description,40)};
+
+  const nodes=Object.values(nm);
+  const links=[];
+  for(const it of bb.intents){const tgt=it.to||it.id;for(const s of it.from)
+    links.push({source:s,target:tgt,active:!it.to&&!!it.worker,techs:kw(it.description)});}
+
+  // Topology layout (layered DAG)
+  const inD={};nodes.forEach(n=>inD[n.id]=0);
+  links.forEach(l=>{if(nm[l.target])inD[l.target]=(inD[l.target]||0)+1;});
+  const ly={};
+  function al(id,l){if((ly[id]||-1)>=l)return;ly[id]=l;links.filter(x=>x.source===id).forEach(x=>al(x.target,l+1));}
+  nodes.filter(n=>!inD[n.id]).forEach(n=>al(n.id,0));
+  nodes.forEach(n=>{if(ly[n.id]===undefined)ly[n.id]=0;});
+  const mxL=Math.max(...Object.values(ly),0);
+  const byL={};nodes.forEach(n=>{(byL[ly[n.id]]=byL[ly[n.id]]||[]).push(n);});
+
+  // Dynamic height based on layers
+  const layerH=Math.min(90,Math.max(50,(H-20)/(mxL+1)));
+  const realH=Math.max(H,(mxL+1)*layerH+20);
+  cv.height=realH;
+
+  // Position nodes
+  Object.entries(byL).forEach(([l,ns])=>{
+    const y=20+parseInt(l)*layerH;
+    const maxPerRow=Math.ceil(ns.length/Math.max(1,Math.ceil(ns.length/3)));
+    ns.forEach((n,i)=>{
+      const colW=W/(ns.length+1);
+      n.x=colW*(i+1);n.y=y;
+    });
+  });
+
+  const cols={origin:'#0ea5e9',goal:'#10b981',fact:'#8b5cf6',intent:'#f59e0b',flag:'#10b981'};
+
+  ctx.clearRect(0,0,W,realH);
+
+  // Draw edges with tech labels
+  for(const l of links){
+    const s=nodes.find(n=>n.id===l.source),t=nodes.find(n=>n.id===l.target);
+    if(!s||!t)continue;
+    // Edge line
+    ctx.beginPath();ctx.moveTo(s.x,s.y);
+    const my=(s.y+t.y)/2;
+    ctx.bezierCurveTo(s.x,my,t.x,my,t.x,t.y);
+    ctx.strokeStyle=l.active?'#f59e0b':'#cbd5e1';ctx.lineWidth=l.active?2:1.5;
+    if(l.active)ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
+
+    // Tech label on edge midpoint
+    if(l.techs&&l.techs.length){
+      ctx.fillStyle='#f59e0b';ctx.font='8px Inter';ctx.textAlign='center';
+      const label=l.techs.join(' · ');
+      // Background pill
+      const tw=ctx.measureText(label).width;
+      ctx.fillStyle='rgba(245,158,11,.12)';
+      ctx.fillRect(my-5-tw/2-3,my-5,tw+6,11);
+      ctx.fillStyle='#d97706';
+      ctx.fillText(label,my-5,my+3);
+    }
+  }
+
+  // Draw nodes
+  for(const n of nodes){
+    const c=cols[n.type]||'#94a3b8';
+    const isCore=n.type==='origin'||n.type==='goal'||n.type==='flag';
+    const r=isCore?16:12;
+
+    // Glow
+    ctx.shadowColor=c;ctx.shadowBlur=isCore?8:4;
+    ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    ctx.fillStyle=c+'22';ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=2;
+    ctx.stroke();ctx.shadowBlur=0;
+
+    // ID label inside circle
+    ctx.fillStyle='#1e293b';ctx.font='bold 8px SF Mono';ctx.textAlign='center';
+    ctx.fillText(n.label,n.x,n.y+3);
+
+    // Keyword + short desc below node
+    if(n.keywords.length||n.short){
+      // Keywords as colored tags
+      let yPos=n.y+r+6;
+      if(n.keywords.length){
+        ctx.font='bold 8px Inter';ctx.textAlign='center';
+        ctx.fillStyle=c;
+        ctx.fillText(n.keywords.join(' · '),n.x,yPos);
+        yPos+=10;
+      }
+      // Short description
+      if(n.short&&n.type!=='origin'&&n.type!=='goal'){
+        ctx.font='8px Inter';ctx.fillStyle='#64748b';
+        // Wrap text
+        const words=n.short.split(' ');let line='';const maxW=100;
+        for(const w of words){
+          const test=line+w+' ';
+          if(ctx.measureText(test).width>maxW&&line){ctx.fillText(line.trim(),n.x,yPos);yPos+=9;line=w+' ';}
+          else line=test;
+        }
+        if(line.trim())ctx.fillText(line.trim(),n.x,yPos);
+      }
+    }
+  }
+
+  // Tooltip on hover
+  cv.onmousemove=e=>{
+    const r=cv.getBoundingClientRect();const mx2=e.clientX-r.left,my2=e.clientY-r.top;
+    let hit=null;
+    for(const n of nodes){if(Math.sqrt((mx2-n.x)**2+(my2-n.y)**2)<18){hit=n;break;}}
+    if(hit){
+      tt.style.display='block';
+      const sx=Math.min(mx2+10,W-280);
+      tt.style.left=sx+'px';tt.style.top=(my2-5)+'px';
+      const flagMatch=hit.desc.match(/flag\{[^}]+\}/);
+      tt.innerHTML=`<div style="font-family:monospace;font-weight:700;color:${cols[hit.type]||'#94a3b8'};margin-bottom:3px">${hit.id} (${hit.type})</div>`+
+        `<div style="color:var(--text);line-height:1.4;word-break:break-word;max-height:200px;overflow-y:auto">${esc(hit.desc||'')}</div>`+
+        (flagMatch?`<div style="color:var(--green);font-weight:600;margin-top:4px;font-family:monospace;font-size:10px">${flagMatch[0]}</div>`:'');
+      cv.style.cursor='pointer';
+    }else{tt.style.display='none';cv.style.cursor='default';}
+  };
+  cv.onclick=e=>{
+    const r=cv.getBoundingClientRect();const mx2=e.clientX-r.left,my2=e.clientY-r.top;
+    for(const n of nodes){if(Math.sqrt((mx2-n.x)**2+(my2-n.y)**2)<18){
+      const f=bb.facts.find(x=>x.id===n.id)||{id:n.id,description:n.desc};
+      const it=bb.intents.find(i=>i.id===n.id);
+      sD(n.id,n.type.toUpperCase(),f,it);break;}}
+  };
+  cv.onmouseleave=()=>{tt.style.display='none';};
+}
+
+// ── Overview
+async function loadOV(){const d=await api('overview');
+  const s=d.stats;$('ovB').textContent=`${s.solved} solved / ${s.flags} flags / ${s.challenges} challenges`;
+  // Radar chart
+  drawRadar(d.categories||{});
+  // Category heatmap table
+  const cs=$('catStats');cs.innerHTML='';
+  const cats=Object.entries(d.categories||{}).sort((a,b)=>(a[1].prefix||'z').localeCompare(b[1].prefix||'z'));
+  if(cats.length){
+    cs.innerHTML=`<table style="width:100%;font-size:11px;border-collapse:collapse">
+      <thead><tr style="color:var(--d2);text-align:left">
+        <th style="padding:4px 6px">家族</th><th style="padding:4px 6px">解出</th>
+        <th style="padding:4px 6px">率</th><th style="padding:4px 6px">Flags</th>
+        <th style="padding:4px 6px">死路</th><th style="padding:4px 6px">Facts</th>
+      </tr></thead><tbody>${cats.map(([cat,st])=>{
+        const pct=st.total?Math.round(st.solved/st.total*100):0;
+        const col=pct===100?'var(--green)':(pct>50?'var(--amber)':(pct>0?'var(--orange,#e67e22)':'var(--d2)'));
+        const de=st.dead_ends||0;
+        return `<tr style="border-top:1px solid var(--bd)">
+          <td style="padding:4px 6px"><span style="font-weight:600;color:${col}">${st.prefix||'?'}</span> ${cat}</td>
+          <td style="padding:4px 6px">${st.solved}/${st.total}</td>
+          <td style="padding:4px 6px"><span style="color:${col};font-weight:600">${pct}%</span></td>
+          <td style="padding:4px 6px">${st.flags||0}</td>
+          <td style="padding:4px 6px;color:${de>3?'var(--red,#e74c3c)':'var(--d2)'}">${de}</td>
+          <td style="padding:4px 6px">${st.facts||0}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  // Flag stories
+  const sl=$('storyList');$('storyB').textContent=`${d.flag_stories?.length||0} stories`;
+  if(!d.flag_stories?.length){sl.innerHTML='<div class="eh">暂无解题记录</div>';}
+  else{sl.innerHTML=d.flag_stories.map(s=>`<div class="story-card">
+    <div class="story-head"><span class="story-code">${s.code}</span>
+    <span class="story-flag">${s.flags?.[0]||''}</span></div>
+    <div class="story-step" style="font-size:10px;color:var(--d2)">${s.n_facts} facts / ${s.n_intents} intents / ${s.solved?'solved':'partial'}</div>
+    ${s.chain.map(c=>`<div class="story-step"><span class="story-act">${c.action}</span><span class="story-find">${esc(c.finding)}</span></div>`).join('')}
+  </div>`).join('');}
+  // Attack surface overview
+  renderAttackSurface(d.nodes||[],d.links||[]);}
+
+function drawRadar(cats){
+  const cv=$('radarCv'),ctx=cv.getContext('2d'),cx=180,cy=130,R=90;
+  const entries=Object.entries(cats).filter(([k,v])=>v.prefix);
+  if(!entries.length){ctx.fillStyle='#94a3b8';ctx.font='12px Inter';ctx.textAlign='center';ctx.fillText('暂无数据',cx,cy);return;}
+  entries.sort((a,b)=>(a[1].prefix||'').localeCompare(b[1].prefix||''));
+  const labels=entries.map(([k])=>entries.find(([_,v])=>v===entries[0][1])?k:k);
+  const N=entries.length;
+  ctx.clearRect(0,0,360,280);
+  for(let r=1;r<=4;r++){ctx.beginPath();for(let i=0;i<=N;i++){const a=-Math.PI/2+i*2*Math.PI/N;
+    const x=cx+Math.cos(a)*R*r/4,y=cy+Math.sin(a)*R*r/4;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+    ctx.strokeStyle='#e2e8f0';ctx.stroke();}
+  for(let i=0;i<N;i++){const a=-Math.PI/2+i*2*Math.PI/N;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);
+    ctx.strokeStyle='#cbd5e1';ctx.stroke();
+    ctx.fillStyle='#64748b';ctx.font='10px Inter';ctx.textAlign='center';
+    ctx.fillText(entries[i][1].prefix||entries[i][0],cx+Math.cos(a)*(R+15),cy+Math.sin(a)*(R+15)+3);}
+  ctx.beginPath();
+  for(let i=0;i<N;i++){const a=-Math.PI/2+i*2*Math.PI/N;
+    const st=entries[i][1];const pct=st.total?st.solved/st.total:0;
+    const x=cx+Math.cos(a)*R*pct,y=cy+Math.sin(a)*R*pct;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.closePath();ctx.fillStyle='rgba(59,130,246,.15)';ctx.fill();
+  ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;ctx.stroke();}
+
+function renderAttackSurface(nodes,links){
+  const box=$('ovDagBox');
+  if(!nodes.length){box.innerHTML='<div class="eh">暂无数据</div>';return;}
+  // Group by family prefix
+  const fam={};
+  nodes.forEach(n=>{const p=(n.challenge.match(/^[a-z0-9]+/)||['?'])[0];
+    (fam[p]=fam[p]||{nodes:0,links:0,flags:0,challenges:new Set()});
+    fam[p].nodes++;fam[p].challenges.add(n.challenge);if(n.type==='flag')fam[p].flags++;});
+  links.forEach(l=>{const p=(l.challenge.match(/^[a-z0-9]+/)||['?'])[0];if(fam[p])fam[p].links++;});
+  const famNames={a:'Web应用',b:'多阶段APT',c:'已知产品',d:'云攻击',e1:'WAF绕过',e2:'沙箱逃逸',e3:'对抗规避',f1:'内存漏洞',f2:'固件逆向'};
+  const famOrder=['c','d','e1','a','e2','b','e3','f1','f2'];
+  const entries=famOrder.filter(p=>fam[p]).map(p=>[p,fam[p]])
+    .concat(Object.entries(fam).filter(([p])=>!famOrder.includes(p)));
+  $('ovDagB').textContent=entries.length+' 家族 / '+nodes.length+' 节点';
+  box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">'
+    +entries.map(([p,d])=>{
+    const total=d.challenges.size;
+    const solved=[...d.challenges].filter(c=>{
+      const ns=nodes.filter(n=>n.challenge===c);
+      return ns.some(n=>n.type==='flag');
+    }).length;
+    const rate=total?Math.round(solved/total*100):0;
+    const col=rate===100?'var(--green)':(rate>0?'var(--amber)':'var(--d2)');
+    return '<div style="background:var(--s2);border-radius:8px;padding:10px;border-left:3px solid '+col+';cursor:pointer;transition:transform .15s"'+
+      ' onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'"'+
+      ' onclick="selC(\''+[...d.challenges][0]+'\');sw(\'detail\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+      '<span style="font-weight:600;font-size:13px">'+p+'</span>'+
+      '<span style="font-size:11px;color:'+col+';font-weight:600">'+solved+'/'+total+'</span></div>'+
+      '<div style="font-size:10px;color:var(--d2);margin-bottom:6px">'+(famNames[p]||p)+'</div>'+
+      '<div style="display:flex;gap:10px;font-size:10px;color:var(--d2)">'+
+      '<span>节点 '+d.nodes+'</span>'+
+      '<span>连接 '+d.links+'</span>'+
+      (d.flags?'<span style="color:var(--green);font-weight:600">flag '+d.flags+'</span>':'')+
+      '</div></div>';
+  }).join('')+'</div>';
+}
+
+// ── Drawer
+function sD(id,type,f,it){const dr=$('drawer'),c=$('dContent');
+  let h=`<h3>${type}: ${id}</h3>`;
+  if(f)h+=`<div class="dr"><div class="dk">description</div><div class="dv">${esc(f.description||'')}</div></div>`;
+  if(it){h+=`<div class="dr"><div class="dk">from</div><div class="dv">${it.from?.join(', ')||''}</div></div>`;
+    h+=`<div class="dr"><div class="dk">to</div><div class="dv">${it.to||'(pending)'}</div></div>`;
+    h+=`<div class="dr"><div class="dk">worker</div><div class="dv">${it.worker||'unclaimed'}</div></div>`;}
+  c.innerHTML=h;dr.classList.add('open');}
+function cD(){$('drawer').classList.remove('open');}
+
+// ── Refresh
+function startR(){if(timer)clearInterval(timer);
+  timer=setInterval(()=>{
+    loadLive();
+    // Auto-select first challenge if none selected
+    if(tab==='detail'&&!cur){
+      const first=document.querySelector('.ci');
+      if(first&&first.dataset.code)selC(first.dataset.code);
+    }
+    if(tab==='detail'&&cur){refreshBB();refreshTL();}
+    else if(tab==='overview')loadOV();},3000);}
+
+cWS();loadCfg();loadLive();
+</script>
+</body>
+</html>
