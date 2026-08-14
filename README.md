@@ -142,7 +142,7 @@ TSec Benchmark v1：63 题，23000 分，360 分钟窗口，并发 3，DeepSeek 
 ### Install
 
 ```bash
-git clone https://github.com/yourname/wormhole.git
+git clone https://github.com/Gach0ng/Wormhole.git
 cd wormhole
 
 pip install .            # 核心依赖：fastapi + uvicorn
