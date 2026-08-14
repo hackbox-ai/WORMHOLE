@@ -9,8 +9,8 @@
 #   4. bash solve.sh <TOKEN> <题目代码>
 #
 # 示例:
-#   bash solve.sh d680be82-3c0e-46fc-84a2-9ccb7b6e4119 a-05
-#   bash solve.sh d680be82-3c0e-46fc-84a2-9ccb7b6e4119  all       # 跑所有题
+#   bash solve.sh <your-token> a-05
+#   bash solve.sh <your-token> all       # 跑所有题
 #
 # 日志写到 solver_runs/solve-<题目>-<时间>.log
 # ──────────────────────────────────────────────────────────────
