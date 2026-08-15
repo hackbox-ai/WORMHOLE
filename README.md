@@ -5,8 +5,6 @@
 **Wormhole** · 面向复杂攻击链的图谱认知渗透智能体
 
 [![TSec Benchmark](https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square)]()
-[![Leaderboard](https://img.shields.io/badge/Leaderboard-Top_3-8b5cf6?style=flat-square)]()
-[![Flags](https://img.shields.io/badge/Flags-68%2F74-1f6feb?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white)]()
 [![Platform](https://img.shields.io/badge/platform-docker%20%7C%20local-2496ed?style=flat-square&logo=docker&logoColor=white)]()
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)]()
@@ -175,8 +173,12 @@ python -m wormhole.ui.launch        # 桌面 GUI（可选：WORMHOLE_GUI_PROXY=1
 
 <table>
   <tr>
-    <td width="50%" align="center"><img src="docs/images/webui-dashboard.png" alt="Web UI"><sub><b>Web UI</b> · 题目进度 / flag 统计 / 知识图谱可视化</sub></td>
-    <td width="50%" align="center"><img src="docs/images/gui-dashboard.png" alt="Desktop GUI"><sub><b>桌面 GUI</b> · 攻击面图谱 / 代理流量 / 内置浏览器</sub></td>
+    <td width="50%" align="center" valign="top"><img src="docs/images/webui-dashboard.png" alt="Web UI" width="100%"></td>
+    <td width="50%" align="center" valign="top"><img src="docs/images/gui-dashboard.png" alt="Desktop GUI" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Web UI</b> · 题目进度 / flag 统计 / 知识图谱可视化</sub></td>
+    <td align="center"><sub><b>桌面 GUI</b> · 攻击面图谱 / 代理流量 / 内置浏览器</sub></td>
   </tr>
 </table>
 
