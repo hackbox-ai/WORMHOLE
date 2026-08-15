@@ -1,18 +1,15 @@
-<!-- 图片待补充：将截图放入 docs/images/ 后自动渲染（banner / webui / gui / 曲线图） -->
-
-<h1 align="center">虫洞 Wormhole</h1>
-<h3 align="center">面向复杂攻击链的图谱认知渗透智能体</h3>
 <p align="center">
-  <img src="https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square" alt="TSec Benchmark">
-  <img src="https://img.shields.io/badge/Leaderboard-Top_3-8b5cf6?style=flat-square" alt="Leaderboard">
-  <img src="https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
-  <img src="https://img.shields.io/badge/platform-docker%20%7C%20local-2496ed?style=flat-square&logo=docker&logoColor=white" alt="Platform">
-  <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">
+  <img src="docs/images/banner.png" alt="Wormhole">
 </p>
 
-<p align="center">
-  <img src="docs/images/banner.png" alt="Wormhole Banner" width="100%">
-</p>
+**Wormhole** · 面向复杂攻击链的图谱认知渗透智能体
+
+[![TSec Benchmark](https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square)]()
+[![Leaderboard](https://img.shields.io/badge/Leaderboard-Top_3-8b5cf6?style=flat-square)]()
+[![Flags](https://img.shields.io/badge/Flags-68%2F74-1f6feb?style=flat-square)]()
+[![Python](https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white)]()
+[![Platform](https://img.shields.io/badge/platform-docker%20%7C%20local-2496ed?style=flat-square&logo=docker&logoColor=white)]()
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)]()
 
 ---
 
@@ -20,32 +17,31 @@
 
 真实业务系统中的漏洞多以多阶段、跨边界的链式形态存在：单个注入点往往只是攻击链入口，达成目标还需要凭据提取、横向移动等多个环节的衔接。规则驱动的扫描工具无法覆盖未知漏洞模式；线性对话式的 LLM Agent 缺乏结构化的知识持久化，长程任务中上下文丢失、重复探索已排除路径。
 
-虫洞将渗透测试建模为**知识图谱（DAG）的增量构建过程**：每一步侦察发现、漏洞确认、凭据获取与 flag 捕获均以不可变事实节点沉淀，推理在图谱拓扑上展开，死胡同被显式标注并在后续轮次中剪枝。系统的三条设计原则：
+Wormhole 将渗透测试建模为**知识图谱（DAG）的增量构建过程**：每一步侦察发现、漏洞确认、凭据获取与 flag 捕获均以不可变事实节点沉淀，推理在图谱拓扑上展开，死胡同被显式标注并在后续轮次中剪枝。三条设计原则：
 
-1. **知识只增不改** —— 事实节点 append-only，推理历史完整可溯，跨轮次可继承
-2. **决策基于图谱状态** —— 方向选择、停滞判定、退出控制均由图拓扑的标量比较驱动，不依赖 LLM 自我评估
-3. **预算流向信息增益** —— 止损轮转调度使时间预算持续流向有产出的方向，而非单题耗尽
+| 设计原则 | 含义 |
+|----------|------|
+| **知识只增不改** | 事实节点 append-only，推理历史完整可溯，跨轮次可继承 |
+| **决策基于图谱状态** | 方向选择、停滞判定、退出控制由图拓扑的标量比较驱动，不依赖 LLM 自我评估 |
+| **预算流向信息增益** | 止损轮转调度使时间预算持续流向有产出的方向，而非单题耗尽 |
 
-**TSec Benchmark v1 实测**（63 题 / 23000 分 / 360 分钟 / 并发 3）：得分 **21000 / 23000（91.3%）**，**位列总榜前三**；单次运行捕获 **60 / 74** 个 flag，覆盖全部六大能力域，多阶段渗透系列多台靶机达成全 flag（4/4）。
+## Benchmark 结果
 
-## 核心指标
+TSec Benchmark v1（63 题 / 23000 分 / 360 min / 并发 3 / DeepSeek V4）：
 
 | 指标 | 数值 |
 |------|------|
 | 总得分 | **21000 / 23000（91.3%），总榜前三** |
-| flag 捕获 | 60 / 74（含多 flag 题） |
+| flag 捕获 | **68 / 74**（含多 flag 题） |
 | 首轮遍历 | ~180 min 完成全部 63 题，50 flag / 15550 分 |
 | 首个 flag | 启动后第 7 min |
 | 能力域覆盖 | Web 漏洞 / 二进制漏洞 / CVE 利用 / AI 应用安全 / 云攻击 / 对抗规避，全部有产出 |
 | 多阶段渗透 | 多台靶机全 flag（4/4），完整走通外网 → 内网横向 → OA → 数据库链路 |
 
-> **[图占位] flag 累积曲线** — `docs/images/flag-cumulative.png`
->
-> 横轴 0–360 min，纵轴累积 flag 数：Phase 1 全题快遍 180 min 内爬升至 50，Phase 2 wall-clock 重试阶段收敛至 60。
-
 <p align="center">
-  <img src="docs/images/flag-cumulative.png" alt="Flag Cumulative Curve" width="88%">
+  <img src="docs/images/flag-cumulative.png" alt="Flag 累积曲线" width="90%">
 </p>
+<p align="center"><sub>flag 累积曲线：Phase 1 全题快遍 180 min 内爬升至 50，Phase 2 wall-clock 重试阶段收敛至 68。</sub></p>
 
 ## 系统架构
 
@@ -161,8 +157,6 @@ python -m wormhole.solver.cli_solve --concurrency 3 --wall-clock 350 -v
 # 或使用封装脚本：bash solve.sh <TOKEN> all
 ```
 
-常用参数：
-
 | 参数 | 默认 | 说明 |
 |------|------|------|
 | `--concurrency` | 3 | 并发解题数（受平台三容器上限约束） |
@@ -172,26 +166,19 @@ python -m wormhole.solver.cli_solve --concurrency 3 --wall-clock 350 -v
 | `--runs-dir` | `solver_runs/` | 运行数据目录 |
 | `--skills-dir` | 内置 | 方法论知识库路径，传空串禁用挂载 |
 
-**Web UI 看板**：
+**Web UI 看板 / 桌面 GUI**：
 
 ```bash
-python -m wormhole.solver.webui     # http://localhost:8765
+python -m wormhole.solver.webui     # Web UI · http://localhost:8765
+python -m wormhole.ui.launch        # 桌面 GUI（可选：WORMHOLE_GUI_PROXY=1 / WORMHOLE_GUI_CDP=1）
 ```
 
-**桌面 GUI**（运行数据查看 + 内置浏览器）：
-
-```bash
-python -m wormhole.ui.launch
-# 可选：WORMHOLE_GUI_PROXY=1 / WORMHOLE_GUI_CDP=1
-```
-
-> **[截图占位] Web UI 实时看板** — `docs/images/webui-dashboard.png`
->
-> 题目进度 / flag 统计 / 知识图谱可视化 / OODA 决策事件时间线。
-
-> **[截图占位] 桌面 GUI** — `docs/images/gui-dashboard.png`
->
-> 攻击面图谱 + 代理流量面板 + 内置浏览器三视图联动。
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/webui-dashboard.png" alt="Web UI"><sub><b>Web UI</b> · 题目进度 / flag 统计 / 知识图谱可视化</sub></td>
+    <td width="50%" align="center"><img src="docs/images/gui-dashboard.png" alt="Desktop GUI"><sub><b>桌面 GUI</b> · 攻击面图谱 / 代理流量 / 内置浏览器</sub></td>
+  </tr>
+</table>
 
 ### 托管沙箱部署
 
@@ -232,8 +219,8 @@ Wormhole/
 
 ## 免责声明
 
-虫洞仅供**授权安全测试**使用：CTF 竞赛、自有靶场、书面授权的渗透测试与安全研究。使用者须自行确保测试行为在授权范围内，并对使用本工具产生的一切后果负责。禁止用于任何未授权用途。
+Wormhole 仅供**授权安全测试**使用：CTF 竞赛、自有靶场、书面授权的渗透测试与安全研究。使用者须自行确保测试行为在授权范围内，并对使用本工具产生的一切后果负责。禁止用于任何未授权用途。
 
-## ⚖️ License
+## License
 
 Apache-2.0. See [LICENSE](LICENSE).
