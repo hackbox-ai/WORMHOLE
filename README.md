@@ -1,9 +1,7 @@
 <!-- 图片待补充：将截图放入 docs/images/ 后自动渲染（banner / webui / gui / 曲线图） -->
 
 <h1 align="center">虫洞 Wormhole</h1>
-
 <h3 align="center">面向复杂攻击链的图谱认知渗透智能体</h3>
-
 <p align="center">
   <img src="https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square" alt="TSec Benchmark">
   <img src="https://img.shields.io/badge/Leaderboard-Top_3-8b5cf6?style=flat-square" alt="Leaderboard">
@@ -223,14 +221,14 @@ Wormhole/
 │   │   └── benchmark_client.py  # 平台 API 客户端（start / submit / close）
 │   └── ui/                      # 桌面 GUI（运行看板 + 内置浏览器）
 ├── containers/                  # Dockerfile.solver / .slim / .hosted + 入口脚本
-├── docs/technical-report.md     # 技术报告（架构 / 方法 / 形式化推导）
+├── docs/images/                 # 品牌与截图资源
 └── solve.sh                     # 本地解题封装脚本
 ```
 
 ## 延伸阅读
 
-- [技术报告：面向复杂攻击链的图谱认知渗透智能体](docs/technical-report.md) —— 架构设计、调度策略形式化、死胡同分类判定、失效 flag 对抗、提交状态机
 - [`wormhole/solver/skills/ctf-solve-strategy/SKILL.md`](wormhole/solver/skills/ctf-solve-strategy/SKILL.md) —— 题型路由索引与七领域方法论决策树
+- 各核心模块（`blackboard.py` / `dispatcher.py` / `cli_solve.py` / `worker.py`）头部含完整设计说明
 
 ## 免责声明
 
