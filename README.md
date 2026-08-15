@@ -1,15 +1,16 @@
-<p align="center">
-  <img src="docs/images/banner.png" alt="Wormhole">
-</p>
+<div align="center">
 
 # 虫洞 Wormhole
-
-面向复杂攻击链的图谱认知渗透智能体
+### 面向复杂攻击链的图谱认知渗透智能体
 
 [![TSec Benchmark](https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white)]()
 [![Platform](https://img.shields.io/badge/platform-docker%20%7C%20local-2496ed?style=flat-square&logo=docker&logoColor=white)]()
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)]()
+
+<img src="docs/images/banner.png" alt="Wormhole Banner"/>
+
+</div>
 
 ---
 
