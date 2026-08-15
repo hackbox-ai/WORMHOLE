@@ -2,7 +2,9 @@
   <img src="docs/images/banner.png" alt="Wormhole">
 </p>
 
-**Wormhole** · 面向复杂攻击链的图谱认知渗透智能体
+# 虫洞 Wormhole
+
+面向复杂攻击链的图谱认知渗透智能体
 
 [![TSec Benchmark](https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white)]()
@@ -27,19 +29,23 @@ Wormhole 将渗透测试建模为**知识图谱（DAG）的增量构建过程**�
 
 TSec Benchmark v1（63 题 / 23000 分 / 360 min / 并发 3 / DeepSeek V4）：
 
-| 指标 | 数值 |
-|------|------|
-| 总得分 | **21000 / 23000（91.3%），总榜前三** |
-| flag 捕获 | **68 / 74**（含多 flag 题） |
-| 首轮遍历 | ~180 min 完成全部 63 题，50 flag / 15550 分 |
-| 首个 flag | 启动后第 7 min |
-| 能力域覆盖 | Web 漏洞 / 二进制漏洞 / CVE 利用 / AI 应用安全 / 云攻击 / 对抗规避，全部有产出 |
-| 多阶段渗透 | 多台靶机全 flag（4/4），完整走通外网 → 内网横向 → OA → 数据库链路 |
+<div align="center">
 
-<p align="center">
-  <img src="docs/images/flag-cumulative.png" alt="Flag 累积曲线" width="90%">
-</p>
-<p align="center"><sub>flag 累积曲线：Phase 1 全题快遍 180 min 内爬升至 50，Phase 2 wall-clock 重试阶段收敛至 68。</sub></p>
+<table>
+  <tr><th>指标</th><th>数值</th></tr>
+  <tr><td>总得分</td><td><b>21000 / 23000（91.3%），总榜前三</b></td></tr>
+  <tr><td>flag 捕获</td><td><b>68 / 74</b>（含多 flag 题）</td></tr>
+  <tr><td>首轮遍历</td><td>~180 min 完成全部 63 题，50 flag / 15550 分</td></tr>
+  <tr><td>首个 flag</td><td>启动后第 7 min</td></tr>
+  <tr><td>能力域覆盖</td><td>Web 漏洞 / 二进制漏洞 / CVE 利用 / AI 应用安全 / 云攻击 / 对抗规避，全部有产出</td></tr>
+  <tr><td>多阶段渗透</td><td>多台靶机全 flag（4/4），完整走通外网 → 内网横向 → OA → 数据库链路</td></tr>
+</table>
+
+<img src="docs/images/flag-cumulative.png" alt="Flag 累积曲线" width="88%">
+
+<sub>flag 累积曲线：Phase 1 全题快遍 180 min 内爬升至 50，Phase 2 wall-clock 重试阶段收敛至 68。</sub>
+
+</div>
 
 ## 系统架构
 
