@@ -1,0 +1,98 @@
+{
+  "wormhole-test-method/SKILL.md": [
+    "9ace3070cabff73a10b9fe77da1f0fb53859ddf0857c14852e25f9e69b8b042f",
+    "f5301a031171b0ff7a3a9f2e561432e6cd836c53b89939411ac53fffcdf95721"
+  ],
+  "wormhole-test-method/references/agent-execution.md": [
+    "691c1bad10d4c1197e4ce584c8c940d223c92b1102023116410fbbbaf3af4bf6",
+    "941df129705d314eefe7c683ed0e755512ca6f1dd462064b2390e4513ad2294d"
+  ],
+  "wormhole-test-method/references/auth-session.md": [
+    "7af25f73385283256d3725032646aac6a227b62fdbae1d4face2e8f4f5750500",
+    "f01d39d90110f23946814607af0fa47a16dde089f1519eff90e00c3681664d68"
+  ],
+  "wormhole-test-method/references/browser-trust.md": [
+    "84e30ce5e39d50fee3d3ac2de480c244580e83e05108e357d822a7fcc6b51922",
+    "53b59e5b6db0fafc85bc18441bee65f7cd5613eaf64e6a33d1447ab2eef91cf0"
+  ],
+  "wormhole-test-method/references/business-logic.md": [
+    "fff347dc99d350386e196cbed14859c016d0060bdd3f36ee276bd89dde8313f8",
+    "c3dda8e3708216aa932e251493dbc2f4604b56e83b5801ef4c2d66f94ac2ed38"
+  ],
+  "wormhole-test-method/references/cache-http.md": [
+    "af5c5aef3887dd259b7ab887ef50c5c6fa53809432103e0b155689d20845b078",
+    "f50ea0cc441a82311ecbf88b2273e1852220d239fec2b9e608b23a04a9dbe143"
+  ],
+  "wormhole-test-method/references/evidence.md": [
+    "7d95629574e13c41f853a63f0fa4ebc3414be8ea50657aaedd04ab5216b25138",
+    "8672d7a33f9de571c821af1a40639a3ec9f416c1d1f98a6ddff750ff02ba771a"
+  ],
+  "wormhole-test-method/references/exposure-components.md": [
+    "634ae5e0302420d230f0bbbcb417c178ad7a30329738bdd4c082f8b6e5fa6288",
+    "17f017e8f9110d54c1149fd9572f2edc2f015b6e431c4e298d1dae0f18b2399b"
+  ],
+  "wormhole-test-method/references/files-storage.md": [
+    "3a9afffbc60581a832ececa43f142131673ae4923daf140e47a711f22f5ed446",
+    "0a0a41196650896dd1a60d67ec0b5a7818cbb2652a3f1b444a6b10fbfd6ddaf8"
+  ],
+  "wormhole-test-method/references/filter-gateway.md": [
+    "a21628387747c3902e2efb92cf67c75bc85e91d5f5781c4f52521ec8f5b2788c",
+    "81f819a757dc87071977eebee5c5227cd7869323e6d035079cdd980b9a8618b5"
+  ],
+  "wormhole-test-method/references/graphql-websocket.md": [
+    "1c2ff0770bf5c41aaecc1cc46117331d5bc49523ec3f43e9ec6aa5d734fa002a",
+    "5af7fee8fa178b8a513d3e7f050c51b90e3f5569b70e5a3ec20f5f8a222f8338"
+  ],
+  "wormhole-test-method/references/identity-protocols.md": [
+    "f507e1773b2136d9e0d4fb78945945a71643720a42e1c3b5e1356b89492f843b",
+    "7336d5adc20500123fd3e4a5b38648f81dee110192b402d2de5fb75b90c2d6f7"
+  ],
+  "wormhole-test-method/references/js-recon.md": [
+    "87e979caa835981fcf52c0378256faca661b621b25009d30d964b51f3225b332",
+    "fe34ba0373d767c5126ed8d92e6873b463585879123d70baabeb2a43c3d18954"
+  ],
+  "wormhole-test-method/references/mass-assignment.md": [
+    "27d1828e110b8d17ccb5f7d90a112290ccb239299757b52683505ad3bc41b5af",
+    "28ac3077a0381d197aef9091e664af09d6cb13ce20086fcfbf21c63afc6e7b35"
+  ],
+  "wormhole-test-method/references/messages.md": [
+    "8309f02948a7ac1dcf5bca3dabd96c232ddea129d19a2cd2e93f9587fd02702d",
+    "ca4b59bf97dcdefa6bed068974249d5e9439243d538fe7764f0f564c9135c94d"
+  ],
+  "wormhole-test-method/references/object-authz.md": [
+    "328037a0fbfa04fe226d03b2a8f55595110a0e982b8ed56f494cdc1dcb010367",
+    "b6536e445ed60fc4e97a2f65e8233270f439dc268ab691e44b178e8e88d9b139"
+  ],
+  "wormhole-test-method/references/parsers.md": [
+    "33594c07559aa36b306961f67ee5ae2e4ad85ede4caba7ead72859fef957ee45",
+    "b8be2eb28f38508fc980e4f6ad3e7eb2912076627c8106c69626b29de609a696"
+  ],
+  "wormhole-test-method/references/query-injection.md": [
+    "4ca6b7f9fc30e9e84b50a6b533372ecb8a026cf558e970e6e956eae76be8953e",
+    "2ec53dfd14a88aa7e7a26c95016ad2fd2e35ba1a7e0f2c3854d07a06f2057c6b"
+  ],
+  "wormhole-test-method/references/race.md": [
+    "69b73b2da7196529d36eb13be9fd35b25621c5fb4a6eddcfb1448d5a717bac2d",
+    "2a15f1c1c2603af9eb2c2f8c037511bd245e7d0c32f42135cf3567872a75fe21"
+  ],
+  "wormhole-test-method/references/ssrf.md": [
+    "151264b253ff2040df9c4abf145cb5f064854d3da18406d47bc26f74163f062f",
+    "5098569120c2eb4edd85162cad8e4809561e057be9db23222443f985d239beac"
+  ],
+  "wormhole-test-method/references/template-command.md": [
+    "327e22e2faaa10668be381c4e574f0f56aa55aca981c35e037c9743413059dcd",
+    "cc76cd2458765d55fd4d73ead9081e5980a7b8454dc3783cdee2e75aa461a9cb"
+  ],
+  "wormhole-test-method/references/web-tests.md": [
+    "9c71213c65aee221f68d2582eefe777e708f611b711233275f2eea1aa1116687",
+    "f6aee587801394665edf81a7daa9eac3be0269ae1f29599a8d7d3d0e7e54c025"
+  ],
+  "wormhole-test-method/references/webauthn.md": [
+    "479cdc18895e7bda9f9ab4565d58d02d793242acd734984a939c5509bd533684",
+    "146c896c92901e7aa9caae9f195af3e59199c4ff835c93f2731ca7a3dc70abfd"
+  ],
+  "wormhole-test-method/references/xss.md": [
+    "9b4b5de7b28581c6a27a7437f5225351581cccf8df5b3a4886a14e25fce22d51",
+    "a55668a5cba95f33c09adc91fc0b0287f7a132e601c961d0e1c4ac5ea80ba17d"
+  ]
+}

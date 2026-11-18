@@ -1,0 +1,6 @@
+# Optional local toolchain image. Uses the same application and runtime volumes.
+services:
+  wormhole:
+    image: wormhole-analysis:local
+    build:
+      target: analysis

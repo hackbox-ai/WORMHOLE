@@ -1,0 +1,2 @@
+import {notificationHTTP} from '../../src/domains/notify/http.ts';
+let body='';for await(const b of process.stdin)body+=b;const in_=JSON.parse(body);try{const result=await notificationHTTP(in_.method??'POST',in_.url,in_.headers??{},in_.body===undefined?undefined:Buffer.from(in_.body),AbortSignal.timeout(10000));process.stdout.write(JSON.stringify({body:result.toString(),error:''}));}catch(e){process.stdout.write(JSON.stringify({error:(e as Error).message}));}

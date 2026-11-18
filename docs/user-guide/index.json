@@ -1,0 +1,352 @@
+[
+  {
+    "id": "quickstart",
+    "title": "Quick Start",
+    "group": "Get started",
+    "paths": [],
+    "keywords": [
+      "First time",
+      "Getting Started"
+    ]
+  },
+  {
+    "id": "extensions",
+    "title": "Optional extensions",
+    "group": "Configuration",
+    "paths": [
+      "/system/extensions"
+    ],
+    "keywords": [
+      "Optional",
+      "Installation",
+      "Data Packet",
+      "White box",
+      "REA"
+    ]
+  },
+  {
+    "id": "llm",
+    "title": "Model configuration",
+    "group": "Configuration",
+    "paths": [
+      "/system/llm"
+    ],
+    "keywords": [
+      "LLM",
+      "Agent",
+      "thinking",
+      "Context",
+      "SSE"
+    ]
+  },
+  {
+    "id": "llm-retry",
+    "title": "Retry and failover",
+    "group": "Configuration",
+    "paths": [],
+    "keywords": [
+      "SDK",
+      "429",
+      "Empty response",
+      "Meltdown",
+      "Back off"
+    ]
+  },
+  {
+    "id": "agents",
+    "title": "Agent",
+    "group": "Configuration",
+    "paths": [
+      "/system/agents"
+    ],
+    "keywords": [
+      "Prompt word",
+      "Trigger",
+      "Worker"
+    ]
+  },
+  {
+    "id": "mcp",
+    "title": "MCP",
+    "group": "Configuration",
+    "paths": [
+      "/system/mcp"
+    ],
+    "keywords": [
+      "Tool Authorization",
+      "Connection Service"
+    ]
+  },
+  {
+    "id": "skills",
+    "title": "Skill",
+    "group": "Configuration",
+    "paths": [
+      "/system/skills"
+    ],
+    "keywords": [
+      "Skill",
+      "Compressed package"
+    ]
+  },
+  {
+    "id": "tools",
+    "title": "Tool",
+    "group": "Configuration",
+    "paths": [
+      "/system/tools",
+      "/function/commands"
+    ],
+    "keywords": [
+      "shell",
+      "Script",
+      "Command"
+    ]
+  },
+  {
+    "id": "tasks",
+    "title": "Dialogue and Quests",
+    "group": "Tasks and results",
+    "paths": [
+      "/chat",
+      "/function/tasks"
+    ],
+    "keywords": [
+      "Batch",
+      "Concurrency",
+      "Timeout",
+      "Template",
+      "Pause",
+      "Stop"
+    ]
+  },
+  {
+    "id": "modeling",
+    "title": "Business Modeling",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/business-models"
+    ],
+    "keywords": [
+      "Backstage",
+      "System entrance",
+      "Draft"
+    ]
+  },
+  {
+    "id": "browser",
+    "title": "Task Browser",
+    "group": "Tasks and results",
+    "paths": [],
+    "keywords": [
+      "Login",
+      "Cookie",
+      "Session",
+      "Account",
+      "Human-machine takeover"
+    ]
+  },
+  {
+    "id": "findings",
+    "title": "Discovery, path and retest",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/findings"
+    ],
+    "keywords": [
+      "Finding",
+      "Report",
+      "link",
+      "Evidence"
+    ]
+  },
+  {
+    "id": "assets",
+    "title": "Assets and Scope",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/assets",
+      "/function/sync"
+    ],
+    "keywords": [
+      "Enterprise",
+      "ICP",
+      "CIDR",
+      "Import"
+    ]
+  },
+  {
+    "id": "traffic",
+    "title": "Traffic and Evidence",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/traffic"
+    ],
+    "keywords": [
+      "MITM",
+      "Request",
+      "Response",
+      "Binding"
+    ]
+  },
+  {
+    "id": "fingerprints",
+    "title": "Fingerprint management",
+    "group": "Configuration",
+    "paths": [
+      "/system/fingerprints"
+    ],
+    "keywords": [
+      "Product Identification",
+      "Rules"
+    ]
+  },
+  {
+    "id": "pocs",
+    "title": "PoC Knowledge Base",
+    "group": "Configuration",
+    "paths": [
+      "/system/pocs"
+    ],
+    "keywords": [
+      "Fingerprint correlation",
+      "Candidate",
+      "Vulnerability Template"
+    ]
+  },
+  {
+    "id": "reverse",
+    "title": "Reverse and code analysis",
+    "group": "Configuration",
+    "paths": [
+      "/system/reverse"
+    ],
+    "keywords": [
+      "JS",
+      "White box",
+      "Source code"
+    ]
+  },
+  {
+    "id": "network",
+    "title": "Springboard Channel",
+    "group": "Configuration",
+    "paths": [],
+    "keywords": [
+      "Connector",
+      "Multiple hops",
+      "Onsite",
+      "Agent"
+    ]
+  },
+  {
+    "id": "notifications",
+    "title": "Notice",
+    "group": "Configuration",
+    "paths": [
+      "/system/notify"
+    ],
+    "keywords": [
+      "Mail",
+      "SMTP",
+      "High risk",
+      "Ringtone",
+      "Webhook"
+    ]
+  },
+  {
+    "id": "intercept",
+    "title": "Interception and Approval",
+    "group": "Configuration",
+    "paths": [
+      "/system/intercept"
+    ],
+    "keywords": [
+      "ALLOW",
+      "ASK",
+      "DENY",
+      "Rules"
+    ]
+  },
+  {
+    "id": "settings",
+    "title": "System configuration",
+    "group": "Maintenance",
+    "paths": [
+      "/system/settings"
+    ],
+    "keywords": [
+      "Operating Budget",
+      "Search",
+      "Python",
+      "Update"
+    ]
+  },
+  {
+    "id": "workspace",
+    "title": "Workspace",
+    "group": "Maintenance",
+    "paths": [
+      "/function/workspace"
+    ],
+    "keywords": [
+      "Occupied",
+      "Cleanup",
+      "Product",
+      "File"
+    ]
+  },
+  {
+    "id": "trace",
+    "title": "Trace and Log",
+    "group": "Maintenance",
+    "paths": [
+      "/function/llm-records",
+      "/system/logs"
+    ],
+    "keywords": [
+      "Token",
+      "Original text",
+      "Troubleshooting"
+    ]
+  },
+  {
+    "id": "dashboard",
+    "title": "Dashboard",
+    "group": "Get started",
+    "paths": [
+      "/dashboard"
+    ],
+    "keywords": [
+      "Token",
+      "Cache",
+      "Statistics"
+    ]
+  },
+  {
+    "id": "account",
+    "title": "Accounts and Appearance",
+    "group": "Maintenance",
+    "paths": [
+      "/system/account",
+      "/system/appearance"
+    ],
+    "keywords": [
+      "Username",
+      "Password",
+      "Topic"
+    ]
+  },
+  {
+    "id": "troubleshooting",
+    "title": "FAQ",
+    "group": "Maintenance",
+    "paths": [],
+    "keywords": [
+      "No feedback",
+      "No traffic",
+      "Connection failed",
+      "Empty report"
+    ]
+  }
+]

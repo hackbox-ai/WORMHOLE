@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createServer,type Server} from 'node:http';
+import {Pool} from 'pg';
+import {loadConfig} from '../src/config.ts';
+import {runMigrations} from '../src/db/migrate.ts';
+import {routeRequest,type AppContext} from '../src/api/server.ts';
+import {AgentsService} from '../src/domains/agents/service.ts';
+import {AssetsService} from '../src/domains/assets/service.ts';
+import {FindingsService} from '../src/domains/findings/service.ts';
+import {InterceptService} from '../src/domains/intercept/service.ts';
+import {TaskEngine} from '../src/domains/tasks/engine.ts';
+import {TaskService} from '../src/domains/tasks/service.ts';
+import {TaskChatService} from '../src/domains/tasks/chat.ts';
+import {LlmService} from '../src/domains/llm/service.ts';
+import {startMockAnthropic} from './fixtures/mock-anthropic.ts';
+import {projectActivity} from '../src/domains/activity/projector.ts';
+import {runTool} from '../src/domains/tools/gate.ts';
+import {resetPiRuntime} from '../src/pi/session-host.ts';
+
+test('UI task control API cancels native Pi; goal proof closes frontier; main reply is live SSE; report is Markdown',async()=>{
+ const base=loadConfig(),schema=`codex_task_ui_${process.pid}_${Date.now()}`,admin=new Pool({connectionString:base.database.dsn});
+ await admin.query(`CREATE SCHEMA ${schema}`);const pool=new Pool({connectionString:base.database.dsn,options:`-c search_path=${schema}`});
+ const dir=await mkdtemp(path.join(tmpdir(),'wormhole-task-ui-')),agentDir=path.join(dir,'agent');await mkdir(agentDir);await writeFile(path.join(agentDir,'models.json'),'{}');
+ const config={...base,dataDir:dir,pi:{...base.pi,agentDir,modelsPath:path.join(agentDir,'models.json')}},dlq=path.join(dir,'dlq'),servers:Server[]=[];
+ let engine:TaskEngine|undefined,chat:TaskChatService|undefined;
+ const until=async(fn:()=>Promise<boolean>|boolean,label:string,ms=15000)=>{const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await new Promise(r=>setTimeout(r,25));}assert.fail(label);};
+ const listen=async(s:Server)=>{servers.push(s);await new Promise<void>(r=>s.listen(0,'127.0.0.1',r));return `http://127.0.0.1:${(s.address() as {port:number}).port}`;};
+ try{
+  await runMigrations(pool);await pool.query("SELECT setval(pg_get_serial_sequence('tasks','id'),500,false)");
+  const agents=new AgentsService(pool,dlq),assets=new AssetsService(pool,dlq),findings=new FindingsService(pool,dlq),intercept=new InterceptService(pool,dlq);
+  engine=new TaskEngine(pool,config,{agents,assets,findings,intercept,settingsConsumers:{get:()=>({workers:1,taskConcurrencyEnabled:false,taskConcurrencyLimit:1,trafficCapture:false}),getRebuildCount:()=>0}});
+  const tasks=new TaskService(pool,dlq,id=>void engine!.launch(id),(id,action)=>{if(action==='pause')engine!.pause(id);if(action==='resume')engine!.resume(id);if(action==='stop')engine!.abort(id);});
+  chat=new TaskChatService(pool,config,agents);
+  const ctx={pool,config,agents,tasks,taskEngine:engine,taskChat:chat,auth:{verifyToken:async()=>true}} as unknown as AppContext;
+  const url=await listen(createServer((q,r)=>void routeRequest(q,r,ctx))),headers={Authorization:'Bearer isolated-fixture','Content-Type':'application/json'};
+  let hits=0;const target=await listen(createServer((_q,r)=>{hits++;r.end('controlled fixture');}));
+  const mock=await startMockAnthropic(0,{delayMs:700,tool:body=>{
+   const names=(body.tools as {name:string}[]|undefined)?.map(t=>t.name)??[];
+   const last=(body.messages as {content:{type:string}[]}[]|undefined)?.at(-1);
+   return names.includes('http_request')&&!last?.content.some(c=>c.type==='tool_result')?{name:'http_request',input:{url:target}}:undefined;
+  }});servers.push(mock.server);
+  const llm=new LlmService(pool,dlq,config.pi.modelsPath),profile=await llm.createProfile({name:'fixture',format:'anthropic',model:'mock-1',base_url:`http://127.0.0.1:${(mock.server.address() as {port:number}).port}`,api_key:'fixture'});
+  await llm.activate(Number(profile.profile!.id));await llm.compileToPiRuntime();resetPiRuntime();
+  const seed=async()=>{const t=await tasks.create({name:'UI fixture',goal:'local fixture',queued:true});assert.ok(t.ok);const id=Number(t.task.id);await engine!.graph.addGoal(id,{text:'verify controlled fixture'});await engine!.graph.addIntent(id,{summary:'controlled HTTP'});return id;};
+  const id=await seed();await engine.launch(id);await until(()=>mock.state.calls.length===1,'worker entered model');
+  const paused=await fetch(`${url}/api/tasks/${id}/control`,{method:'POST',headers,body:JSON.stringify({action:'pause'})});assert.equal(paused.status,200);assert.equal((await paused.json()).paused,true);
+  await until(async()=>!(await pool.query("SELECT 1 FROM exploration_nodes WHERE task_id=$1 AND state='running'",[id])).rowCount,'lease released');await new Promise(r=>setTimeout(r,800));assert.equal(hits,0,'pause blocks the model-planned HTTP side effect');
+  assert.equal((await fetch(`${url}/api/tasks/${id}/control`,{method:'POST',headers,body:JSON.stringify({action:'resume'})})).status,200);
+  await until(()=>hits===1,'resume executes exactly once');await until(async()=>!(await pool.query("SELECT 1 FROM exploration_nodes WHERE task_id=$1 AND state='running'",[id])).rowCount,'worker ended');
+  await tasks.control(id,'stop');await engine.drain(id);
+  const goalTask=await seed();await engine.graph.addIntent(goalTask,{summary:'must never claim'});const before=mock.state.calls.length;await engine.launch(goalTask);await until(()=>mock.state.calls.length>before,'next native worker entered model');
+  const goal=Number((await pool.query("SELECT id FROM exploration_nodes WHERE task_id=$1 AND kind='goal'",[goalTask])).rows[0].id),fact=await engine.graph.recordFact(goalTask,{summary:'controlled fact',evidence:'fixture proof'},'worker');
+  const proof=await runTool(pool,'prove_goal',{goal_id:goal,evidence_id:fact},{businessKind:'planner',businessId:`task-${goalTask}`,taskId:goalTask,agentKey:'planner'});assert.equal(proof.status,'executed',proof.error);
+  await engine.drain(goalTask);assert.equal((await tasks.get(goalTask))!.status,'done');assert.equal((await pool.query("SELECT count(*)::int n FROM exploration_nodes WHERE task_id=$1 AND kind='intent' AND state IN('open','running')",[goalTask])).rows[0].n,0);assert.equal(hits,1,'goal completion cancels the in-flight action');
+  assert.equal((await pool.query("SELECT count(*)::int n FROM business_events WHERE business_id=$1 AND event_type='task_done'",[String(goalTask)])).rows[0].n,1,'terminal event written once');
+  await assert.rejects(()=>engine!.graph.addIntent(goalTask,{summary:'late planner'},{viaAgent:true}),/结束/);
+  const batch=await fetch(`${url}/api/tasks/control/batch`,{method:'POST',headers,body:JSON.stringify({task_ids:[String(id),String(goalTask)],action:'pause'})});assert.equal(batch.status,200);assert.ok((await batch.json()).items.every((x:any)=>!x.ok));
+  const stopped=Number((await pool.query("SELECT id FROM exploration_nodes WHERE task_id=$1 AND kind='intent' AND state='stopped' ORDER BY id LIMIT 1",[goalTask])).rows[0].id);
+  assert.equal((await fetch(`${url}/api/tasks/${goalTask}/intents/${stopped}/rerun`,{method:'POST',headers,body:'{}'})).status,200);
+  assert.equal((await pool.query('SELECT status FROM explorations WHERE id=(SELECT exploration_id FROM tasks WHERE id=$1)',[goalTask])).rows[0].status,'open');
+  await until(()=>hits===2,'explicit human rerun executes after achieved completion');
+  await until(async()=>!(await pool.query("SELECT 1 FROM exploration_nodes WHERE task_id=$1 AND state='running'",[goalTask])).rowCount,'rerun lease ended');
+  await tasks.control(goalTask,'stop');await engine.drain(goalTask);
+  const exploration=Number((await pool.query('SELECT exploration_id FROM tasks WHERE id=$1',[goalTask])).rows[0].exploration_id);assert.notEqual(exploration,goalTask);
+  const filtered=await (await fetch(`${url}/api/commands?task_id=${goalTask}`,{headers})).json();
+  const legacy=await (await fetch(`${url}/api/commands?task=${exploration}`,{headers})).json();assert.deepEqual(filtered,legacy);assert.equal(filtered.total,1);
+  const stats=await (await fetch(`${url}/api/commands/stats?task_id=${goalTask}`,{headers})).json();assert.equal(stats.stats.find((x:any)=>x.tool==='http_request').total,1);
+  for(const bad of ['999999999','wrong'])assert.equal((await (await fetch(`${url}/api/commands?task_id=${bad}`,{headers})).json()).total,0,'unresolvable task never broadens to all calls');
+  const reportTask=await tasks.create({name:'report fixture',goal:'prove only local data',queued:true});assert.ok(reportTask.ok);const rid=Number(reportTask.task.id);
+  const f=await findings.record({task_id:rid,name:'Fixture finding',vulnclass:'fixture',severity:'high',summary:'Fixture summary',evidence:'GET /fixture\nstatus 200'});
+  await pool.query("UPDATE findings SET report='## 复现步骤\n\n1. Read the controlled fixture.\n\n## 修复建议\n\nUse fixture controls.' WHERE id=$1",[f.finding_id]);
+  const report=await fetch(`${url}/api/report?task=${rid}`,{headers});assert.equal(report.status,200);assert.match(report.headers.get('content-type')!,/text\/markdown/);const md=await report.text();assert.match(md,/^# 渗透测试报告/);assert.match(md,/原始证据/);assert.match(md,/详细报告/);assert.match(md,/复现步骤/);assert.match(md,/status 200/);
+  // Keep an SSE reader open BEFORE mainagent input; no page refresh or polling API.
+  const textMock=await startMockAnthropic(0,{marker:'MAIN_LIVE'});servers.push(textMock.server);
+  await pool.query('UPDATE llm_profiles SET base_url=$1 WHERE id=$2',[`http://127.0.0.1:${(textMock.server.address() as {port:number}).port}`,profile.profile!.id]);await llm.compileToPiRuntime();resetPiRuntime();
+  const ctl=new AbortController(),stream=await fetch(`${url}/api/exploration/activity/stream?task=${rid}&since=0`,{headers,signal:ctl.signal});assert.equal(stream.status,200);const reader=stream.body!.getReader();
+  assert.equal((await chat.send(rid,'Return local fixture only')).status,202);
+  const status=await fetch(`${url}/api/tasks/${rid}/chat/status`,{headers});assert.equal((await status.json()).running,true,'frontend receives running rather than only busy');
+  let frames='';const timer=setTimeout(()=>ctl.abort(),10000);
+  try{while(!frames.includes('MAIN_LIVE')){await projectActivity(pool);const chunk=await reader.read();if(chunk.done)break;frames+=new TextDecoder().decode(chunk.value);}assert.match(frames,/MAIN_LIVE/,'live result available without refresh');assert.match(frames,/"main_seg":0/);}finally{clearTimeout(timer);ctl.abort();await reader.cancel().catch(()=>{});}
+  await until(()=>!chat!.isBusy(rid),'live turn ended');
+  chat.wire(engine,async()=>{throw new Error('fixture tool assembly failure');});assert.equal((await chat.send(rid,'error fixture')).status,202);await until(()=>!chat!.isBusy(rid),'error turn ended');assert.equal((await pool.query("SELECT count(*)::int n FROM activity WHERE exploration_id=(SELECT exploration_id FROM tasks WHERE id=$1) AND worker='mainagent' AND kind='result' AND is_error",[rid])).rows[0].n,1,'assembly failure is visible, never a blank successful turn');
+ }finally{await chat?.shutdown();await engine?.shutdown();resetPiRuntime();for(const s of servers){s.closeAllConnections();await new Promise<void>(r=>s.close(()=>r()));}await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();await rm(dir,{recursive:true,force:true});}
+});

@@ -1,235 +1,200 @@
-<div align="center">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="web/public/brand/logo-light.svg" />
+    <img src="web/public/brand/logo.svg" alt="WORMHOLE" width="420" />
+  </picture>
+</p>
 
-# 虫洞 Wormhole
-### 面向复杂攻击链的图谱认知渗透智能体
+<h1 align="center">WORMHOLE</h1>
 
-[![TSec Benchmark](https://img.shields.io/badge/TSec_Benchmark-21000%2F23000_pts_(91.3%25)-2b9246?style=flat-square)]()
-[![Python](https://img.shields.io/badge/python-3.12+-3776ab?style=flat-square&logo=python&logoColor=white)]()
-[![Platform](https://img.shields.io/badge/platform-docker%20%7C%20local-2496ed?style=flat-square&logo=docker&logoColor=white)]()
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)]()
+<p align="center"><strong>Secure reasoning and verification system for complex business systems</strong></p>
+<p align="center">Turn research goals into evidence-driven investigations and reviewable results. </p>
 
-<img src="docs/images/banner.png" alt="Wormhole Banner"/>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-176B47?style=flat-square" alt="License: AGPLv3" /></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Deploy-Docker_Compose-2463A6?style=flat-square"alt="Deploy: Docker Compose" /></a>
+  <a href="docs/user-guide/quickstart.md"><img src="https://img.shields.io/badge/Mode-Self--hosted-475569?style=flat-square" alt="Mode: Self-hosted" /></a>
+</p>
 
-</div>
+<p align="center">
+  <a href="#project-overview">Overview</a> ·
+  <a href="#how-to-advance-a-mission">Mission process</a> ·
+  <a href="#system-architecture">Architecture</a> ·
+  <a href="#quick-start">QuickStart</a> ·
+  <a href="#document-navigation">Documentation</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
 ---
 
-## 概述
+## Project Overview
 
-真实业务系统中的漏洞多以多阶段、跨边界的链式形态存在：单个注入点往往只是攻击链入口，达成目标还需要凭据提取、横向移动等多个环节的衔接。规则驱动的扫描工具无法覆盖未知漏洞模式；线性对话式的 LLM Agent 缺乏结构化的知识持久化，长程任务中上下文丢失、重复探索已排除路径。
+A security test usually starts with an incomplete question: what data can be accessed by a certain type of identity, what pre-state does a business operation rely on, and whether existing anomalies are sufficient to constitute a vulnerability. As the test unfolds, new interfaces, permission relationships, and execution results will change the initial judgment.
 
-Wormhole 将渗透测试建模为**知识图谱（DAG）的增量构建过程**：每一步侦察发现、漏洞确认、凭据获取与 flag 捕获均以不可变事实节点沉淀，推理在图谱拓扑上展开，死胡同被显式标注并在后续轮次中剪枝。三条设计原则：
+WORMHOLE organizes security research around this process. It receives the goals and constraints given by the user, transforms the problem into an executable verification direction, coordinates business modeling and tool execution, and then sends the obtained facts back to the planning process. The task can thus unfold step by step along with the evidence, and researchers can add conditions, check the basis for judgments, or pause execution along the way.
 
-| 设计原则 | 含义 |
-|----------|------|
-| **知识只增不改** | 事实节点 append-only，推理历史完整可溯，跨轮次可继承 |
-| **决策基于图谱状态** | 方向选择、停滞判定、退出控制由图拓扑的标量比较驱动，不依赖 LLM 自我评估 |
-| **预算流向信息增益** | 止损轮转调度使时间预算持续流向有产出的方向，而非单题耗尽 |
+The platform supports Web/API security testing, business logic analysis, source code auditing and vulnerability retesting. Its design focuses on how the task continues to advance: how the problem to be verified is formed, how execution resources are allocated, how the results affect subsequent decisions, and what the system bases on ending a study.
 
-## Benchmark 结果
+## How to advance a mission
 
-TSec Benchmark v1（63 题 / 23000 分 / 360 min / 并发 3 / DeepSeek V4）：
+Taking "checking the order access boundaries between two test accounts within the scope of authorization" as an example, WORMHOLE needs to gradually establish the connection between issues, operations and evidence.
 
-<div align="center">
+### 1. Establish task boundaries from research questions
 
-<table>
-  <tr><th>指标</th><th>数值</th></tr>
-  <tr><td>总得分</td><td><b>21000 / 23000（91.3%），总榜前三</b></td></tr>
-  <tr><td>flag 捕获</td><td><b>68 / 74</b>（含多 flag 题）</td></tr>
-  <tr><td>首轮遍历</td><td>~180 min 完成全部 63 题，50 flag / 15550 分</td></tr>
-  <tr><td>首个 flag</td><td>启动后第 7 min</td></tr>
-  <tr><td>能力域覆盖</td><td>Web 漏洞 / 二进制漏洞 / CVE 利用 / AI 应用安全 / 云攻击 / 对抗规避，全部有产出</td></tr>
-  <tr><td>多阶段渗透</td><td>多台靶机全 flag（4/4），完整走通外网 → 内网横向 → OA → 数据库链路</td></tr>
-</table>
+Upon receiving a task, WORMHOLE incorporates goals, system entry, identity conditions, and execution constraints into the task context and organizes the goals that require verification. For example, whether the order belongs to the current account, whether different identities can access the same object, and whether key status changes affect the access results can form different research directions.
 
-<img src="docs/images/flag-cumulative.png" alt="Flag 累积曲线" width="88%">
+These directions are stored in the exploration map along with the mission goals, so that subsequent actions, facts, and findings have clear attribution. The conditions added by researchers can also enter the task process and become the basis for continued planning.
 
-<sub>flag 累积曲线：Phase 1 全题快遍 180 min 内爬升至 50，Phase 2 wall-clock 重试阶段收敛至 68。</sub>
+### 2. Verify while understanding the system
 
-</div>
+WORMHOLE establishes or updates business models in the background, organizing portals, interfaces, identities and business processes. Checks that already have sufficient context can be executed first, and testing does not have to wait for the entire system modeling to be completed; after the modeling is delivered, new business information can be used for subsequent planning.
 
-## 系统架构
+In the order scenario, if the access interface and test identity are known, the system can organize boundary checks first; the subsequently obtained status relationship or associated interface provides context for the new verification direction. Modeling and testing are advanced separately and connected in the task status.
 
-三层分离，接口严格解耦；认知层不感知执行后端实现，同一套推理逻辑可运行于 Docker 编排与单容器子进程两种部署形态。
+### 3. Assign verification direction to available execution resources
 
-| 层 | 职责 | 核心模块 |
-|----|------|----------|
-| 编排层 | 多题并发调度、预算管理、重试队列、平台 API 交互 | `Scheduler` · `BenchmarkClient` |
-| 认知层 | 单题内多轮探索决策、图谱演化、完成/停滞判定 | `Dispatcher` · `Blackboard` |
-| 执行层 | LLM 自主工具调用，claude CLI 驱动 Kali 环境 | `Worker`（docker / local 双后端） |
+When executable intentions appear in the exploration graph, WORMHOLE organizes the collection according to priority and is subject to task quota and execution concurrency constraints. Multiple execution units can handle different directions respectively, and the same intention determines the current execution ownership through the database claiming mechanism.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  编排层 Orchestration                                            │
-│  Scheduler（多题并发/止损轮转）  BenchmarkClient  ResourceManager │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│  认知层 Cognition — Blackboard 知识图谱 (SQLite, append-only)     │
-│                                                                 │
-│         ┌─────┐        ┌─────┐        ┌─────┐                   │
-│   origin┤ f001├────────┤ f002├───┐    ├─f004 │◄ dead-end 标注   │
-│         └──┬──┘        └──┬──┘   │    └──────┘                   │
-│            └───────┐       │   ┌──▼───────────┐                 │
-│                  ┌─▼────┐  │   │     goal     │                 │
-│                  │ f003 │──┴──►│   (flag ✓)   │                 │
-│                  └──────┘      └──────────────┘                 │
-│                                                                 │
-│     OODA: Bootstrap → Reason → Explore → Checkpoint ↻           │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│  执行层 Execution — Worker 双后端抽象                             │
-│         WORMHOLE_WORKER_BACKEND = docker │ local                │
-│   ┌─────────────────────────┐  ┌─────────────────────────┐      │
-│   │ Docker Backend（本地）   │  │ Local Backend（托管沙箱） │      │
-│   │ Kali 容器 + claude CLI   │  │ subprocess + claude CLI  │      │
-│   └─────────────────────────┘  └─────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────┘
+Each execution is bound to a specific task, intent and working directory, and the required tools are assembled according to the authorization. Browser operations, HTTP requests, command execution, and external capability calls are checked according to the corresponding policies, and the results are written into task records. Scheduling thus handles two issues simultaneously: what should be verified currently, and which operations are allowed to be performed under current conditions.
+
+### 4. Let the execution result change the next step
+
+After an inspection, WORMHOLE brings the execution results back to the planning process. New facts, existing discoveries, still-implemented intentions, and business models together form the context for the next round of decision-making, based on which the system organizes continued verification, waiting for other results or supplementary conditions.
+
+For example, if the data of another account is observed, the object ownership, identity difference and actual impact should be further checked; if an access is denied, the result will be left for the current path. Whether to switch to other interfaces in the future still needs to be judged based on the task goal. Anomalies, negative results, and blocking conditions are part of the research process and can help explain why it was continued, diverted, or paused.
+
+This feedback is persisted in the exploration graph and execution log. When the planning call is truncated or fails to produce effective action, the host saves the recovery state and tries again according to the policy; the user can also add identity, scope or business information to obtain new advancement conditions for the task.
+
+### 5. Complete delivery according to evidence and execution boundaries
+
+WORMHOLE treats the end of a task as a state transition that needs to be relied upon. Goal completion, coverage review, time budget, execution conditions and user operations affect the continuation, suspension and ending of tasks respectively. In the continuous mining mode, existing discoveries will not trigger the end alone; early closing requires submitting the coverage and referenced facts or findings, and the host will check the current status.
+
+Registered findings are entered into an independent report queue, and the recurrence process, actual impact and non-covered scope are sorted out based on existing evidence, and the text version and manual modifications are retained. After the task is over, researchers can look back to see which questions were asked, what was actually performed, which conclusions were supported, and which directions remained conditional.
+
+## System architecture
+
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="WORMHOLE Architecture: Research interaction, collaborative orchestration and controlled execution, shared exploration state and evidence base" width="900" />
+</p>
+
+The above process is coordinated by the task host. The interactive portal receives research questions and process intervention, orchestrates service maintenance task life cycle, business modeling and verification scheduling, and executes services to complete tool invocation under policy constraints. Exploration diagrams, raw flows, working files, and persistent events preserve a common research state, allowing different phases to be connected around existing facts.
+
+Task scheduling, modeling and report sorting manage access and life cycle respectively: background modeling does not occupy ordinary task slots, the report queue reads existing evidence, and the results can still be sorted independently after the test is stopped. For the implementation entrance, see [Task Orchestration](pihost/src/domains/tasks), [Business Modeling](pihost/src/domains/modeling), [Tool Gating](pihost/src/domains/tools), [Exploration Map](pihost/src/domains/exploration), [Discovery and Reporting](pihost/src/domains/findings) and [Run Observability](pihost/src/domains/observability).
+
+## Quick start
+
+### Environment preparation
+
+- Linux x86_64, Docker Engine and Docker Compose v2.
+- Access npm, Debian, Go modules and browser download sources when building.
+- Configure available model interfaces at runtime and ensure that the container has access to authorized test targets.
+
+### Deployment
+
+```sh
+git clone https://github.com/Gach0ng/Wormhole.git WORMHOLE
+cd WORMHOLE
+cp .env.example .env
 ```
 
-### 图谱数据模型
+Edit`.env`, fill in the independent database password, then build and start:
 
-| 元素 | 定义 |
-|------|------|
-| **Fact 事实节点** | 不可变知识单元，携带唯一 ID 与自然语言描述；一经创建永不修改 |
-| **Intent 探索意图** | 有向边；推理阶段创建（目标槽位为空），探索产出后关闭并指向新事实，构成推理链路 |
-| **Dead-end 标注** | 三层优先级分类：强正面信号（`flag{` / `RCE confirmed`）＞ 强否定短语（`ruled out` / `not injectable`）＞ 中性；被排除方向以 `dead_end: true` 导出，供后续轮次规避 |
-
-### OODA 认知循环
-
-| 阶段 | 行为 | 产出 |
-|------|------|------|
-| **Bootstrap** | 初始化侦察，建立 origin / goal 节点，注入题型方法论与重试经验块 | 初始图谱 |
-| **Reason** | 读取图谱拓扑，生成下一轮探索方向 | 探索意图集合 |
-| **Explore** | 并发执行工具调用（默认 3 路） | 新事实节点 |
-| **Checkpoint** | 比对事实数 / 开放意图数 / 提示数三标量，判定信息增益 | 继续 / 重置假设 / 退出 |
-
-### 关键机制
-
-| 机制 | 解决的问题 |
-|------|-----------|
-| **自适应止损轮转调度** | 两阶段策略：统一窗口全题快遍（~90 min 收割约 80% flag）后进入 wall-clock 全窗口重试，预算按轮刷新投入未解题目 |
-| **跨轮次经验复用** | 重试不冷启动：从旧图谱提取「已确认发现 + 已排除死路」结构化经验块注入新 origin，探索方向逐轮收敛 |
-| **失效 flag 感知** | 对抗靶场实例轮换导致的 flag 漂移：被拒值进入失效集永不重提，完成判定对失效集作差，杜绝「已捕获未得分」的空转重试 |
-| **双路提交状态机** | 实时路径（事实写入即异步提交）+ 批量路径（题目结束兜底补交）；去重集合仅在提交成功后更新，网络失败时 flag 保持可重试 |
-| **三重退出门控** | 预算硬墙 / flag 停滞检测（容忍度随已获 flag 数线性放大）/ 基础设施宕机检测，各针对一类预算浪费模式 |
-| **题型自适应知识库** | 索引路由 + 七领域专题决策树（Web / 二进制 / AI 应用 / 区块链 / CVE 利用 / 对抗规避 / 云），按需加载，单层负载受控于上下文窗口 |
-
-## 快速开始
-
-### 环境要求
-
-- Python ≥ 3.12，Docker
-- 任一 Anthropic 兼容 API（DeepSeek / Kimi / GLM 等）
-- 执行智能体依赖 [claude code](https://docs.anthropic.com/en/docs/claude-code) CLI（Worker 镜像内已预装）
-
-### 安装
-
-```bash
-git clone https://github.com/Gach0ng/Wormhole.git
-cd Wormhole
-
-pip install .            # 核心依赖：fastapi + uvicorn
-pip install ".[gui]"     # 可选：桌面 GUI（PySide6）
+```dotenv
+POSTGRES_PASSWORD=replace-with-a-unique-strong-password
+WORMHOLE_BIND=127.0.0.1
+WORMHOLE_PORT=18887
 ```
 
-### 配置
-
-| 环境变量 | 必填 | 说明 |
-|----------|:----:|------|
-| `ANTHROPIC_BASE_URL` | ✓ | Anthropic 兼容 API 地址，如 `https://api.deepseek.com` |
-| `ANTHROPIC_AUTH_TOKEN` | ✓ | API Key |
-| `ANTHROPIC_MODEL` | ✓ | 模型名，如 `deepseek-v4-pro` |
-| `BENCHMARK_TOKEN` | ✓* | 平台答题 Token（平台托管模式下由沙箱自动注入） |
-| `BENCHMARK_BASE_URL` | ✓* | 平台 API 地址（同上） |
-| `WORMHOLE_WORKER_BACKEND` |  | `docker`（默认，本地多容器）/ `local`（托管沙箱） |
-| `SOLVER_IMAGE` |  | Worker 镜像名，默认 `wormhole-solver:latest` |
-
-### 构建 Worker 镜像（本地模式）
-
-```bash
-# Kali + 全套渗透工具（nmap / sqlmap / gdb / pwntools / nuclei / ...）
-docker build -f containers/Dockerfile.solver -t wormhole-solver:latest .
+```sh
+docker compose up -d --build
+docker compose ps
 ```
 
-### 运行
+Open [http://127.0.0.1:18887](http://127.0.0.1:18887), create an administrator account, configure the model interface on the **LLM** page and activate it.
 
-**CLI 批量解题**（本地与平台托管同一路径）：
+By default, only the local address is bound. Configure access portal, TLS and access control when using remotely; the database does not need to publish the host port. For startup problems, please check`docker compose logs -f wormhole`, or refer to [Troubleshooting](docs/user-guide/troubleshooting.md).
 
-```bash
-python -m wormhole.solver.cli_solve --concurrency 3 --wall-clock 350 -v
-# 或使用封装脚本：bash solve.sh <TOKEN> all
+### Create the first task
+
+1. Fill in the target system entrance, test target, identity conditions, allowed scope and restrictions.
+2. Check the Agent configuration, tool permissions and execution policy to confirm that the model and target are reachable.
+3. Start the task and observe the progress in the overview, execution path, task dialogue and business modeling.
+4. Check and discover the corresponding original evidence, reports and uncovered areas, and supplement evidence or retest as needed.
+
+See [Quick Start](docs/user-guide/quickstart.md) and [Task Management](docs/user-guide/tasks.md) for complete operating instructions. The same set of offline documentation is available through the in-app help portal.
+
+## Extension and integration
+
+The extension mechanism handles methods, tools, services and knowledge data respectively. Maintain reusable test methods through [Skill](docs/user-guide/skills.md), and access external tools through [MCP](docs/user-guide/mcp.md); installation, availability check, and Agent authorization are managed separately.
+
+Asset and analysis services can be accessed on demand. [ScopeSentry](docs/extensions.md#scopesentry) provides company and asset synchronization entrance, [White-box analysis interface](docs/extensions.md#White-box service) supports code indexing and auditing of compatible services; [Analysis image](docs/extensions.md#rea-with local components) optionally installs REA, Ghidra, JADX and protocol tools. [Network Channel](docs/user-guide/network.md) Access the transit network via connectors and multi-hop routing, with additional permissions for Linux springboard commands and browsers explicitly configured by`compose.network.yaml`.
+
+[PoC](docs/user-guide/pocs.md) and [Fingerprint](docs/user-guide/fingerprints.md) adopt independent data import mechanisms and retain source information. External services, heavy analysis components and complete knowledge data are not enabled by default with the basic platform. For deployment and configuration, see [Extensions] (docs/extensions.md).
+
+## Development and Verification
+
+The front-end uses TypeScript, React and Next.js; the server uses TypeScript, structured business data is stored in PostgreSQL, and traffic and file resources are managed by the corresponding storage module. The network connector and fingerprint adaptation engine use independent Go modules.
+
+The source code is divided by responsibility into [front-end workspace] (web), [API and domain services] (pihost/src), [database migrations] (pihost/migrations), [built-in methods] (pihost/builtin-skills), [optional extensions] (extensions) and [behavior and integration tests] (pihost/tests). The deployment entry is the Compose file in the root directory, and the operation and maintenance script is located at [`scripts/`](scripts).
+
+Local development requires Node.js ≥ 22.19.0 and separate PostgreSQL, configuration files, and data directories. For the configuration structure, see [Backend Development Instructions](pihost/README.md).
+
+```sh
+# Backend
+cd pihost
+npm ci
+npm run typecheck
+WORMHOLE_CONFIG=/absolute/path/config.dev.json npm run dev
 ```
 
-| 参数 | 默认 | 说明 |
-|------|------|------|
-| `--concurrency` | 3 | 并发解题数（受平台三容器上限约束） |
-| `--wall-clock` | 350 | 总时间窗口（min），启用全窗口重试 |
-| `--per-challenge-budget` | 2400 | 单题总预算（s），多 flag 题按 flag 数放大 |
-| `--max-rounds` | 20 | 单题最大认知轮数 |
-| `--runs-dir` | `solver_runs/` | 运行数据目录 |
-| `--skills-dir` | 内置 | 方法论知识库路径，传空串禁用挂载 |
-
-**Web UI 看板 / 桌面 GUI**：
-
-```bash
-python -m wormhole.solver.webui     # Web UI · http://localhost:8765
-python -m wormhole.ui.launch        # 桌面 GUI（可选：WORMHOLE_GUI_PROXY=1 / WORMHOLE_GUI_CDP=1）
+```sh
+# Start the front end in another terminal and execute it from the warehouse root directory
+cd web
+npm ci
+WORMHOLE_API_URL=http://127.0.0.1:18887 npm run dev
 ```
 
-<table>
-  <tr>
-    <td width="50%" align="center" valign="top"><img src="docs/images/webui-dashboard.png" alt="Web UI" width="100%"></td>
-    <td width="50%" align="center" valign="top"><img src="docs/images/gui-dashboard.png" alt="Desktop GUI" width="100%"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><b>Web UI</b> · 题目进度 / flag 统计 / 知识图谱可视化</sub></td>
-    <td align="center"><sub><b>桌面 GUI</b> · 攻击面图谱 / 代理流量 / 内置浏览器</sub></td>
-  </tr>
-</table>
+Isolated acceptance uses a separate database and temporary configuration:
 
-### 托管沙箱部署
-
-面向单容器、禁用嵌套 Docker 的评测平台：
-
-```bash
-docker build -f containers/Dockerfile.slim -t wormhole-hosted:slim .
-docker save wormhole-hosted:slim | gzip > wormhole-hosted.tar.gz
+```sh
+docker compose -f compose.acceptance.yaml up --build --abort-on-container-exit --exit-code-from tests
+docker compose -f compose.acceptance.yaml down
 ```
 
-入口脚本自动完成 LLM 网关 URL 转换（`.tsecbench.gw` 后缀）、root 沙箱适配（`IS_SANDBOX=1`）、Local 后端切换并启动全量解题。详见 [`containers/HOSTED_README.md`](containers/HOSTED_README.md)。
+The test report is saved in`artifacts/acceptance/`. The real model and complete analysis tool chain need to be configured separately. For test steps and boundaries, see [Test Instructions](pihost/docs/reference-tests.md). The performed verification scope is saved by date in [First Version Acceptance](docs/validation.md) and [Recent Update Acceptance](docs/update-2026-11-16.md). The test results of the fixed environment should not be regarded as general effects or performance commitments.
 
-## 仓库结构
+## Operation and data
 
-```
-Wormhole/
-├── wormhole/
-│   ├── solver/                  # 编排 + 认知 + 执行核心
-│   │   ├── cli_solve.py         #   CLI 入口 / Scheduler / flag 提交状态机
-│   │   ├── dispatcher.py        #   OODA 循环 / 完成与停滞判定
-│   │   ├── blackboard.py        #   知识图谱（SQLite DAG，append-only）
-│   │   ├── worker.py            #   Worker 双后端抽象（docker / local）
-│   │   ├── tasks.py / prompts/  #   任务执行与 Prompt 模板
-│   │   ├── webui.py + static/   #   Web 看板（FastAPI，:8765）
-│   │   └── skills/              #   方法论知识库（索引路由 + 专题决策树）
-│   ├── orchestrator/
-│   │   └── benchmark_client.py  # 平台 API 客户端（start / submit / close）
-│   └── ui/                      # 桌面 GUI（运行看板 + 内置浏览器）
-├── containers/                  # Dockerfile.solver / .slim / .hosted + 入口脚本
-├── docs/images/                 # 品牌与截图资源
-└── solve.sh                     # 本地解题封装脚本
+The database and running resources are stored in the`database`and`runtime`named volumes of Compose respectively. Perform a consistent backup before updating, then preserve the volume and rebuild the application:
+
+```sh
+sh scripts/backup.sh ./backups
+git pull --ff-only
+docker compose build wormhole
+docker compose up -d wormhole
 ```
 
-## 延伸阅读
+Database migration is performed when the service starts. Normally stop using`docker compose down`;`down -v`will delete the persistent volume. For the recovery process, see [Backup and Recovery](docs/backup.md). Preview and then execute task resource cleanup, retaining evidence, reports and shared references, see [Resource Cleanup](docs/task-resource-cleanup.md).
 
-- [`wormhole/solver/skills/ctf-solve-strategy/SKILL.md`](wormhole/solver/skills/ctf-solve-strategy/SKILL.md) —— 题型路由索引与七领域方法论决策树
-- 各核心模块（`blackboard.py` / `dispatcher.py` / `cli_solve.py` / `worker.py`）头部含完整设计说明
+## Document Navigation
 
-## 免责声明
+- **Usage and configuration:**[Quick Start](docs/user-guide/quickstart.md), [Task Management](docs/user-guide/tasks.md), [LLM Configuration](docs/user-guide/llm.md), [Agent Configuration](docs/user-guide/agents.md).
+- **Modeling and Evidence:**[Business Modeling](docs/user-guide/modeling.md), [Traffic Management](docs/user-guide/traffic.md), [Discovery Management](docs/user-guide/findings.md), [Report Jobs](docs/report-jobs-and-overview.md).
+- **Development and Deployment:**[Backend Description](pihost/README.md), [Optional Extensions](docs/extensions.md), [Workspace](docs/user-guide/workspace.md), [Backup and Recovery](docs/backup.md).
+- **Verification and changes:**[Test instructions](pihost/docs/reference-tests.md), [First version acceptance](docs/validation.md), [Update record](docs/update-2026-11-16.md).
 
-Wormhole 仅供**授权安全测试**使用：CTF 竞赛、自有靶场、书面授权的渗透测试与安全研究。使用者须自行确保测试行为在授权范围内，并对使用本工具产生的一切后果负责。禁止用于任何未授权用途。
+## Participate in contribution
+
+Submissions of reproducible issues, feature proposals, code improvements, and documentation corrections are welcome. When reporting a problem, please provide the version, deployment method, reproduction steps, expected behavior, and desensitization logs; changes involving execution permissions, life cycle, or persistence should be accompanied by behavioral regression results.
+
+Read the [Contribution Guide](CONTRIBUTING.md) before starting, report issues via [Issues](https://github.com/Gach0ng/Wormhole/issues), and submit changes via [Pull Requests](https://github.com/Gach0ng/Wormhole/pulls).
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Copyright © 2026 WORMHOLE contributors.
+
+WORMHOLE's original code is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**. For complete terms, see [LICENSE](LICENSE). When the modified version provides interactive services to users via the Internet, it must comply with the requirements of Article 13 of AGPLv3 on providing corresponding source code.
+
+Third-party components and derivative content retain their respective copyrights and licenses. For details, see [Third-Party Statement](THIRD_PARTY_NOTICES.md). This project is provided AS IS, subject to license requirements, without warranty.
+
+Only conduct security testing on systems and environments for which explicit authorization has been obtained.

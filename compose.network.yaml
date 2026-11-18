@@ -1,0 +1,9 @@
+# Linux jump-mode commands/browser namespaces need these additional capabilities.
+# Connectors reach the application HTTP entry; internal FRP ports stay private.
+services:
+  wormhole:
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [SYS_ADMIN, NET_ADMIN]
+    security_opt:
+      - seccomp=unconfined

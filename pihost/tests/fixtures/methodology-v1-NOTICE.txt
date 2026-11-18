@@ -1,0 +1,27 @@
+# 来源说明
+
+本技能由用户提供的 ai-pentest、web-vulnhunt-methodology、src-6k-hunting 方法资料蒸馏，重写为 WORMHOLE 的角色、工具、证据和工作空间协议。
+未复制原包的独立状态引擎、任意授权声明、桌面布局或特定项目接口。CVSS 辅助程序根据 FIRST CVSS 3.1 规范独立实现。
+web-vulnhunt-methodology 原许可与作者声明保留如下。
+MIT License
+
+Copyright (c) 2026 w1th0ut (U-Sec / 无界安全)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+

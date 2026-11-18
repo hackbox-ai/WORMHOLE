@@ -1,0 +1,560 @@
+"use client";
+import { HelpButton } from "@/components/user-guide";
+import {TaskCodeAnalysis} from "@/components/reverse-analysis";
+import {TaskNetworkStatus} from "@/components/network-mode";
+
+import * as React from "react";
+import {TaskProgressStatus} from "@/components/task-progress-status";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import {
+  ArchiveIcon,
+  ArrowLeftIcon,
+  BrainIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  PauseIcon,
+  PlayIcon,
+  MessageSquare,
+  LayoutDashboard,
+  GitBranch,
+  Radio,
+  ShieldCheck,
+  RotateCw,
+  Network,
+  AppWindow,
+  Boxes,
+  ListTree,
+  ShieldAlert,
+  FileText,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { StatusBadge } from "@/components/status-badge";
+import { BusinessModelingPanel } from "@/components/business-modeling-panel";
+import { TaskLLMProfileChain } from "@/components/task-llm-profile-chain";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { api, http } from "@/lib/api";
+import type { LLMProfile, Task } from "@/lib/types";
+
+import { AssetsTab } from "./_tabs/assets-tab";
+import { BroadcastTab } from "./_tabs/broadcast-tab";
+import { CoverageGraphTab } from "./_tabs/coverage-graph-tab";
+import { FindingsTab } from "./_tabs/findings-tab";
+import { GraphTab } from "./_tabs/graph-tab";
+import { InterceptTab } from "./_tabs/intercept-tab";
+import { OverviewTab } from "./_tabs/overview-tab";
+import { ReportTab } from "./_tabs/report-tab";
+import { RetestsTab } from "./_tabs/retests-tab";
+import { TaskBrowserPanel, useTaskBrowserSessions } from "@/components/task-browser-panel";
+import { SessionsTab } from "./_tabs/sessions-tab";
+
+const TABS = [
+  { value: "overview", label: "Mission Overview", icon: LayoutDashboard },
+  { value: "graph", label: "Execution path", icon: GitBranch },
+  { value: "sessions", label: "Task dialogue", icon: MessageSquare },
+  { value: "browser", label: "Task Browser", icon: AppWindow },
+  { value: "modeling", label: "Business Modeling", icon: Network },
+  { value: "broadcast", label: "Real-time dynamics", icon: Radio },
+  { value: "findings", label: "Vulnerability discovery", icon: ShieldCheck },
+  { value: "retests", label: "Retest verification", icon: RotateCw },
+  { value: "assets", label: "Asset List", icon: Boxes },
+  { value: "coverage", label: "Overlay view", icon: ListTree },
+  { value: "intercept", label: "Execute Approval", icon: ShieldAlert },
+  { value: "report", label: "Mission report", icon: FileText },
+];
+
+function taskProfileIDs(task: Task): string[] {
+  if (task.llm_profile_ids && task.llm_profile_ids.length > 0) {
+    return task.llm_profile_ids.map(String);
+  }
+  return task.llm_profile_id ? [String(task.llm_profile_id)] : [];
+}
+
+function TaskLLMControl({ task, profiles, onUpdated }: { task: Task; profiles: LLMProfile[]; onUpdated: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [profileIDs, setProfileIDs] = React.useState<string[]>(() => taskProfileIDs(task));
+  const [activeProfileID, setActiveProfileID] = React.useState(
+    task.active_llm_profile_id ? String(task.active_llm_profile_id) : (taskProfileIDs(task)[0] ?? ""),
+  );
+  const [saving, setSaving] = React.useState(false);
+  const popoverContentRef = React.useRef<HTMLDivElement>(null);
+
+  const chain = taskProfileIDs(task);
+  const exhausted = task.llm_failover_state === "chain_exhausted";
+  // Links can be changed in any status,The final state is no exception:After the mission ends, the main Agent The dialogue still follows this chain,
+  // The model on the chain must be replaceable when there is a problem,Otherwise, you will not be able to continue the interaction after completing the task.。
+  const terminal = ["done", "failed", "timeout"].includes(task.status);
+  // A null active profile on an exhausted, non-empty chain is a persisted end
+  // cursor. Keep the status display honest; choosing the first profile is only
+  // the editor's reset draft and does not mean it is currently active.
+  let activeID = chain[0] ?? "";
+  if (exhausted) activeID = "";
+  if (task.active_llm_profile_id) activeID = String(task.active_llm_profile_id);
+  const activeProfile = profiles.find((profile) => profile.id === activeID);
+  const currentLabel = exhausted
+    ? "Configuration chain exhausted"
+    : (activeProfile?.name ?? (activeID ? `Configuration #${activeID}` : "Follow default configuration"));
+  const activeIndex = chain.indexOf(activeID);
+  const backupCount = activeIndex >= 0 ? Math.max(0, chain.length - activeIndex - 1) : 0;
+  const currentTitle = [currentLabel, activeProfile?.model, backupCount > 0 ? `${backupCount} spare` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  let editorDescription = "Adjustments to the sequence or current configuration will take effect from the next LLM call.";
+  if (terminal) editorDescription = "The mission has ended and the changes only affect subsequent main Agent conversations.";
+  let saveLabel = "Save";
+  if (exhausted) saveLabel = "Save and reset";
+  if (saving) saveLabel = "Saving";
+
+  const syncDraft = React.useCallback(() => {
+    const next = taskProfileIDs(task);
+    setProfileIDs(next);
+    setActiveProfileID(task.active_llm_profile_id ? String(task.active_llm_profile_id) : (next[0] ?? ""));
+  }, [task]);
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) syncDraft();
+  };
+
+  const handleProfileIDsChange = (next: string[]) => {
+    setProfileIDs(next);
+    setActiveProfileID((current) => (next.includes(current) ? current : (next[0] ?? "")));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const result = await api.updateTaskLLMProfiles(
+        task.id,
+        profileIDs.map(Number),
+        activeProfileID ? Number(activeProfileID) : undefined,
+      );
+      if (result.switch_event) {
+        toast.info(result.switch_event.summary, { id: `task-${task.id}-llm-${result.switch_event.seq}` });
+      } else {
+        toast.success(
+          result.reopened_intents > 0
+            ? `LLM configuration updated and restored ${result.reopened_intents} Quota blocking intention`
+            : "LLM configuration updated",
+        );
+      }
+      setOpen(false);
+      onUpdated();
+    } catch (error) {
+      toast.error("Update failed:" + (error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          size="sm"
+          variant={exhausted ? "destructive" : "outline"}
+          aria-label="View or switch task LLM configuration"
+          title={currentTitle}
+        >
+          <BrainIcon data-icon="inline-start" />
+          <span className="hidden max-w-36 truncate lg:inline">{currentLabel}</span>
+          {backupCount > 0 && <span className="hidden text-muted-foreground xl:inline">+{backupCount}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent ref={popoverContentRef} align="start" className="w-[min(28rem,calc(100vw-2rem))] gap-4 p-4">
+        <PopoverHeader>
+          <PopoverTitle>Task LLM Configuration Chain</PopoverTitle>
+          <PopoverDescription>{editorDescription}</PopoverDescription>
+        </PopoverHeader>
+
+        {exhausted && (
+          <Alert variant="destructive">
+            <CircleAlertIcon />
+            <AlertTitle>Configuration chain quota has been exhausted</AlertTitle>
+            <AlertDescription>
+              {task.llm_failover_reason ?? "All selected configurations are judged to have insufficient quota. Saving the configuration chain resets the fault state."}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <TaskLLMProfileChain
+          profiles={profiles}
+          value={profileIDs}
+          onValueChange={handleProfileIDsChange}
+          activeProfileId={activeProfileID}
+          onActiveProfileChange={setActiveProfileID}
+          inputId="task-llm-profiles"
+          disabled={saving}
+          portalContainer={popoverContentRef}
+        />
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+
+            Close
+          </Button>
+          <Button type="button" size="sm" onClick={save} disabled={saving}>
+            {saving && <Spinner data-icon="inline-start" />}
+            {saveLabel}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function TaskDetailInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
+  const [task, setTask] = React.useState<Task | null>(null);
+  const [paused, setPaused] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+  const [tab, setTab] = React.useState(()=>TABS.some(t=>t.value===searchParams.get("tab"))?searchParams.get("tab")!:"overview");
+  const [interceptPendingCount, setInterceptPendingCount] = React.useState(0);
+  const [profiles, setProfiles] = React.useState<LLMProfile[]>([]);
+  const [archiving, setArchiving] = React.useState(false);
+  const [stopping, setStopping] = React.useState(false);
+  const executing = task?.status === "running" && !paused && !task.queued && !stopping;
+  const browsers = useTaskBrowserSessions(id, !!id);
+  const browserCount = browsers.sessions.length;
+  const loginRequested = browserCount > 0 && browsers.sessions.some((session) => session.loginRequested);
+
+  React.useEffect(() => {
+    api
+      .llmProfiles()
+      .then(setProfiles)
+      .catch(() => setProfiles([]));
+  }, []);
+
+  React.useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api
+        .interceptTask(id)
+        .then((rows) => {
+          if (alive) setInterceptPendingCount(rows.filter((r) => r.status === "pending").length);
+        })
+        .catch(() => {
+          // Polling is best-effort; the next interval retries automatically.
+        });
+    void load();
+    const t = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [id]);
+
+  const taskLoadInFlight = React.useRef<string | null>(null);
+  const load = React.useCallback(() => {
+    if (taskLoadInFlight.current === id) return;
+    taskLoadInFlight.current = id;
+    Promise.all([api.task(id), api.stats(id).catch(() => null)])
+      .then(([task, s]) => {
+        if (taskLoadInFlight.current !== id) return;
+        const base = { ...task };
+        const at = s?.active_task;
+        if (at) {
+          base.in_flight = at.in_flight;
+          base.goals_total = at.goals_total;
+          base.goals_met = at.goals_met;
+          base.engine_mode = s?.engine_mode ?? at.engine_mode;
+          base.paused = at.paused;
+        }
+        setTask(base);
+        setPaused(at?.paused ?? base.paused ?? false);
+      })
+      .catch(() => {
+        // Keep the last rendered task state during a transient poll failure.
+      })
+      .finally(() => {
+        if (taskLoadInFlight.current === id) {
+          taskLoadInFlight.current = null;
+          setLoaded(true);
+        }
+      });
+  }, [id]);
+  React.useEffect(() => {
+    load();
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  async function togglePause() {
+    if (task && ["done", "failed", "timeout"].includes(task.status)) return;
+    const next = !paused;
+    try {
+      await api.controlTask(id, next ? "pause" : "resume");
+      setPaused(next);
+      toast.success(next ? "Exploration paused" : "Exploration resumed");
+    } catch (e) {
+      toast.error("Operation failed:" + (e as Error).message);
+    }
+  }
+
+  async function stopTask() {
+    if (stopping) return;
+    setStopping(true);
+    try {
+      await http("/tasks/" + encodeURIComponent(id) + "/stop", { method: "POST" });
+      toast.success("Worker stopped, existing report saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Stop task failed");
+    } finally {
+      setStopping(false);
+      load();
+    }
+  }
+
+  async function archiveTask() {
+    if (!task || archiving) return;
+    setArchiving(true);
+    try {
+      await api.archiveTask(task.id);
+      toast.success("Task has been added to the archive queue");
+      router.push("/function/tasks");
+    } catch (error) {
+      toast.error(`Archive failed:${(error as Error).message}`);
+      setArchiving(false);
+    }
+  }
+
+  if (!task) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
+        <p className="text-muted-foreground">{loaded ? `Task ${id} has been deleted, archived, or does not exist` : "Loading…"}</p>
+        {loaded && (
+          <Button asChild variant="outline">
+            <Link href="/function/tasks">
+              <ArrowLeftIcon />  Return to task list
+            </Link>
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  const completed = task.status === "done";
+  const terminal = ["done", "failed", "timeout"].includes(task.status);
+  const archiveLifecycleEligible = terminal || paused || task.status === "paused";
+  const canArchive = archiveLifecycleEligible && !task.archive_blocked_by_task_id;
+  let archiveDisabledReason = task.queued ? "Queued tasks must be paused first" : "Running tasks must be paused first";
+  if (archiveLifecycleEligible && task.archive_blocked_by_task_id) {
+    archiveDisabledReason = `Task is unarchived task #${task.archive_blocked_by_task_id} Direct inheritance, please archive dependent tasks first`;
+  }
+  let controlVariant: "default" | "secondary" | "outline" = "outline";
+  let controlIcon = <PauseIcon data-icon="inline-start" />;
+  let controlLabel = "Pause";
+  if (terminal) {
+    controlVariant = "secondary";
+    controlIcon = <CheckIcon data-icon="inline-start" />;
+    controlLabel = completed ? "Completed" : "Ended";
+  } else if (paused) {
+    controlVariant = "default";
+    controlIcon = <PlayIcon data-icon="inline-start" />;
+    controlLabel = "Recovery";
+  }
+  const archiveTrigger = (
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      disabled={!canArchive || archiving}
+      aria-label={canArchive ? "Archive Task" : archiveDisabledReason}
+    >
+      {archiving ? <Spinner /> : <ArchiveIcon />}
+    </Button>
+  );
+
+  return (
+    <Tabs
+      orientation="vertical"
+      value={tab}
+      onValueChange={setTab}
+      className="task-shell flex min-h-0 flex-1 flex-col gap-0"
+    >
+      {/* Top fixed area */}
+      <header className="task-shell-header flex shrink-0 flex-col gap-2 px-4 py-3 lg:px-6">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-1 md:hidden" />
+          <Button asChild variant="ghost" size="icon" className="size-7">
+            <Link href="/function/tasks">
+              <ArrowLeftIcon />
+            </Link>
+          </Button>
+          <HelpButton compact topic={tab === "browser" ? "browser" : tab === "modeling" ? "modeling" : tab === "assets" || tab === "coverage" ? "assets" : tab === "intercept" ? "intercept" : ["findings","retests","graph","report"].includes(tab) ? "findings" : "tasks"} />
+          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold" title={task.name || task.description}>
+            {task.name || task.description}
+          </h1>
+          <Button variant="ghost" size="sm" onClick={()=>router.push(`/function/workspace/?path=${encodeURIComponent(`tasks/${id}`)}`)}>Working Paper</Button>
+          <code className="hidden rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline">
+            {task.id}
+          </code>
+          <Separator orientation="vertical" className="mx-1 hidden h-4 sm:block" />
+          <TaskLLMControl task={task} profiles={profiles} onUpdated={load} />
+          <StatusBadge domain="task" value={terminal?task.status:paused?"paused":task.queued?"queued":task.status} dot />
+          {canArchive ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>{archiveTrigger}</AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Archive Task #{task.id}？</AlertDialogTitle>
+                  <AlertDialogDescription>
+
+                    Task map, associated records, exclusive assets and traffic, work files and LLM
+                    History will be compressed to cold storage. After archiving is completed, it can be restored on the &quot;Archived&quot; page of the task list.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void archiveTask()}>Confirm archive</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">{archiveTrigger}</span>
+              </TooltipTrigger>
+              <TooltipContent>{archiveDisabledReason}</TooltipContent>
+            </Tooltip>
+          )}
+          <Button size="sm" variant={controlVariant} onClick={togglePause} disabled={terminal || stopping}>
+            {controlIcon}
+            {controlLabel}
+          </Button>
+          {(!terminal || stopping) && <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline" disabled={stopping}>{stopping ? "Stopping..." : "Stop task"}</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Stop current task?</AlertDialogTitle>
+                <AlertDialogDescription>Cancel running Worker and Browser operations and save existing findings and reports.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void stopTask()}>Confirm stop</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{task.goal}</p>
+        <TaskNetworkStatus task={task}/>
+        <TaskCodeAnalysis taskId={task.id}/>
+        <TaskProgressStatus task={task}/>
+        {!!task.modeling_pending&&<p className="text-xs text-muted-foreground">The business modeling is updated in the background and the current test continues to execute.</p>}
+        {!!task.modeling_unavailable&&<p className="text-xs text-muted-foreground">Some business models are temporarily unavailable. You can check the reason in &quot;Business Modeling&quot; or try again.</p>}
+      </header>
+
+      <div className="task-shell-body flex min-h-0 flex-1 flex-col md:flex-row">
+        <aside className="task-view-nav shrink-0" aria-label="Task workspace navigation">
+          <label className="task-mobile-selector md:hidden">
+            <span className="sr-only">Task View</span>
+            <select aria-label="Task View" value={tab} onChange={(event) => setTab(event.target.value)}>
+              {TABS.map((view) => (
+                <option key={view.value} value={view.value}>
+                  {view.label}{view.value === "browser" && browserCount > 0 ? " (" + browserCount + ")" : ""}
+                  {view.value === "intercept" && interceptPendingCount > 0 ? ` (${interceptPendingCount})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="hidden md:block">
+
+            <TabsList className="task-view-tabs" aria-label="Task view directory">
+              {TABS.map((view) => (
+                <TabsTrigger key={view.value} value={view.value} className="task-view-tab">
+                  <view.icon className="size-4 shrink-0" />
+                  <span className="flex-1 text-left">{view.label}</span>
+                  {view.value === "browser" && browserCount > 0 && <span className="task-approval-count">{browserCount}</span>}
+                  {view.value === "intercept" && interceptPendingCount > 0 && (
+                    <span className="task-approval-count">
+                      {interceptPendingCount > 99 ? "99+" : interceptPendingCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </aside>
+        {/* Tab content */}
+        <div data-view={tab} className="task-view-content min-h-0 min-w-0 flex-1 overflow-auto p-4 lg:p-5">
+          <TabsContent value="sessions" className="mt-0 h-full min-h-0">
+            {browserCount > 0 && <div className="mb-2 flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-xs">
+              <span>{loginRequested ? "Worker is waiting for manual login" : browserCount + " Worker browser sessions"}</span>
+              <Button size="sm" variant="ghost" onClick={() => setTab("browser")}>{loginRequested ? "Go to takeover" : "View or take over"}</Button>
+            </div>}
+            <SessionsTab taskId={id} taskRunning={executing} />
+          </TabsContent>
+          <TabsContent value="browser" className="mt-0"><TaskBrowserPanel key={id} taskId={id} active={executing} feed={browsers} /></TabsContent>
+          <TabsContent value="overview" className="mt-0">
+            <OverviewTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="modeling" className="mt-0"><BusinessModelingPanel key={id} taskId={id}/></TabsContent>
+          <TabsContent value="graph" className="mt-0 h-full min-h-0">
+            <GraphTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="broadcast" className="mt-0">
+            <BroadcastTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="findings" className="mt-0">
+            <FindingsTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="retests" className="mt-0">
+            <RetestsTab key={id} taskId={id} />
+          </TabsContent>
+          <TabsContent value="assets" className="mt-0">
+            <AssetsTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="coverage" className="mt-0">
+            <CoverageGraphTab taskId={id} coverageEnabled={task?.coverage_enabled !== false} />
+          </TabsContent>
+          <TabsContent value="intercept" className="mt-0">
+            <InterceptTab taskId={id} />
+          </TabsContent>
+          <TabsContent value="report" className="mt-0">
+            <ReportTab taskId={id} />
+          </TabsContent>
+        </div>
+      </div>
+    </Tabs>
+  );
+}
+
+// useSearchParams must sit under a Suspense boundary for static export.
+export default function TaskDetailPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <TaskDetailInner />
+    </React.Suspense>
+  );
+}

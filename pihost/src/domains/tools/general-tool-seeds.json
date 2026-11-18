@@ -1,0 +1,305 @@
+[
+  {
+    "description": "Reads a file from the local filesystem and returns its contents with line numbers. Use offset/limit for large files. Always read a file before editing it.",
+    "name": "Read",
+    "schema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to read.",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max lines to read (default 2000).",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "1-based line to start from.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Writes a file to the local filesystem, creating parent directories and overwriting any existing file. Prefer Edit for modifying existing files.",
+    "name": "Write",
+    "schema": {
+      "properties": {
+        "content": {
+          "description": "Full contents to write.",
+          "type": "string"
+        },
+        "file_path": {
+          "description": "Path of the file to write.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "content"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Performs an exact string replacement in a file. old_string must match exactly once unless replace_all is set. Read the file first so old_string matches precisely.",
+    "name": "Edit",
+    "schema": {
+      "properties": {
+        "file_path": {
+          "description": "Path of the file to edit.",
+          "type": "string"
+        },
+        "new_string": {
+          "description": "Replacement text.",
+          "type": "string"
+        },
+        "old_string": {
+          "description": "Exact text to replace.",
+          "type": "string"
+        },
+        "replace_all": {
+          "description": "Replace all occurrences.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file_path",
+        "old_string",
+        "new_string"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Applies several exact string replacements to a single file in one atomic operation. Edits are applied in order; if any old_string fails to match (or isn't unique without replace_all), the whole operation aborts and the file is left unchanged.",
+    "name": "MultiEdit",
+    "schema": {
+      "properties": {
+        "edits": {
+          "description": "Edits to apply in order.",
+          "items": {
+            "properties": {
+              "new_string": {
+                "description": "Replacement text.",
+                "type": "string"
+              },
+              "old_string": {
+                "description": "Exact text to replace.",
+                "type": "string"
+              },
+              "replace_all": {
+                "description": "Replace all occurrences.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "old_string",
+              "new_string"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "file_path": {
+          "description": "Path of the file to edit.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path",
+        "edits"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lists the files and subdirectories of a directory (non-recursive). Use Glob to match by pattern across depth, or Grep to search contents.",
+    "name": "LS",
+    "schema": {
+      "properties": {
+        "path": {
+          "description": "Directory to list (default working directory).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Finds files whose path matches a glob pattern (supports ** for any depth, e.g. \"**/*.go\"). Returns paths sorted by modification time, newest first.",
+    "name": "Glob",
+    "schema": {
+      "properties": {
+        "path": {
+          "description": "Directory to search (default working dir).",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Glob pattern, e.g. src/**/*.go",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "A powerful search tool built on ripgrep\n\nUsage:\n- ALWAYS use Grep for search tasks. NEVER invoke `grep` or `rg` as a Bash command. The Grep tool has been optimized for correct permissions and access.\n- Supports full regex syntax (e.g., \"log.*Error\", \"function\\s+\\w+\")\n- Filter files with glob parameter (e.g., \"*.js\", \"**/*.tsx\") or type parameter (e.g., \"js\", \"py\", \"rust\")\n- Output modes: \"content\" shows matching lines, \"files_with_matches\" shows only file paths (default), \"count\" shows match counts\n- Use Agent tool for open-ended searches requiring multiple rounds\n- Pattern syntax: Uses ripgrep (not grep) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)\n- Prefer `head_limit` to avoid large result sets.\n- Multiline matching: By default patterns match within single lines only. For cross-line patterns like `struct \\{[\\s\\S]*?field`, use `multiline: true`\n- Prefer Grep over terminal rg/grep for codebase search unless you specifically need shell features.",
+    "name": "Grep",
+    "schema": {
+      "properties": {
+        "-A": {
+          "description": "Lines of context to show after each match (content mode).",
+          "type": "integer"
+        },
+        "-B": {
+          "description": "Lines of context to show before each match (content mode).",
+          "type": "integer"
+        },
+        "-C": {
+          "description": "Lines of context before and after each match (content mode).",
+          "type": "integer"
+        },
+        "-i": {
+          "description": "Case-insensitive.",
+          "type": "boolean"
+        },
+        "-n": {
+          "description": "Show line numbers (content mode). Default true.",
+          "type": "boolean"
+        },
+        "glob": {
+          "description": "Only search files matching this glob, e.g. *.go or *.{ts,tsx}",
+          "type": "string"
+        },
+        "head_limit": {
+          "description": "Limit output to the first N results (lines/files/counts). Default 250; pass 0 for unlimited.",
+          "type": "integer"
+        },
+        "multiline": {
+          "description": "Multiline mode: . matches newlines and patterns may span lines. Default false.",
+          "type": "boolean"
+        },
+        "offset": {
+          "description": "Skip the first N results before applying head_limit (paging). Default 0.",
+          "type": "integer"
+        },
+        "output_mode": {
+          "description": "files_with_matches (default) | content | count",
+          "type": "string"
+        },
+        "path": {
+          "description": "File or directory to search. Defaults to the working directory.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "RE2 regular expression to search for.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Only search a file type, e.g. go, py, js, ts, rust, java. Unknown types are treated as an extension (type:foo \u2192 *.foo).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Executes a shell command in the working directory and returns combined stdout and stderr. Use for running tests, builds, package managers, and git. Prefer the dedicated file tools for file work. Set run_in_background to return immediately and read the output later.",
+    "name": "Bash",
+    "schema": {
+      "properties": {
+        "command": {
+          "description": "The shell command to execute.",
+          "type": "string"
+        },
+        "run_in_background": {
+          "description": "Run in the background and return immediately; read its output later with TaskOutput or Read, and you are notified when it completes. A foreground command that exceeds its timeout is also moved to the background automatically.",
+          "type": "boolean"
+        },
+        "timeout_ms": {
+          "description": "Timeout in ms (default 120000, max 600000).",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Waits for N seconds, then returns. Use to let a backgrounded command make progress before reading its partial output with TaskOutput. Interrupted immediately if the run is paused or stopped.",
+    "name": "sleep",
+    "schema": {
+      "properties": {
+        "seconds": {
+          "description": "Seconds to wait, 1-3600.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seconds"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lists the background tasks started in this session with their status, exit code, and command.",
+    "name": "TaskList",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Reads the output of a background task started by Bash (run_in_background) or Monitor. You can also Read the task's output-file path directly. Set block=true to wait for the task to finish first.",
+    "name": "TaskOutput",
+    "schema": {
+      "properties": {
+        "block": {
+          "description": "Wait until the task finishes before returning (default false).",
+          "type": "boolean"
+        },
+        "max_bytes": {
+          "description": "Max bytes of output to return from the tail (default 30000).",
+          "type": "integer"
+        },
+        "task_id": {
+          "description": "The task id (e.g. task_1).",
+          "type": "string"
+        },
+        "timeout_ms": {
+          "description": "Max wait when block=true (default 30000).",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Stops a running background task, killing its process tree. Pass a task_id, or omit it to stop all running tasks.",
+    "name": "TaskStop",
+    "schema": {
+      "properties": {
+        "task_id": {
+          "description": "The id of the task to stop. Empty stops all running tasks.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  }
+]

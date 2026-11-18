@@ -1,0 +1,147 @@
+/* The default WORMHOLE workspace uses a deep-space surface.
+   Alternate theme presets retain their own palettes. */
+html:root[data-theme-preset="default"] {
+  --background: #edf3fc;
+  --foreground: #172742;
+  --card: #f9fbff;
+  --card-foreground: #172742;
+  --popover: #f9fbff;
+  --popover-foreground: #172742;
+  --primary: #087d9d;
+  --primary-foreground: #ffffff;
+  --secondary: #e4edfa;
+  --secondary-foreground: #233c5b;
+  --muted: #e5edf8;
+  --muted-foreground: #5e7190;
+  --accent: #dcecf8;
+  --accent-foreground: #164e6a;
+  --border: #cbd8ec;
+  --input: #bfcee4;
+  --ring: #168fae;
+  --sidebar: #e4edfa;
+  --sidebar-foreground: #233c5b;
+  --sidebar-primary: #087d9d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d5e7fa;
+  --sidebar-accent-foreground: #164e6a;
+  --sidebar-border: #c5d6ed;
+  --sidebar-ring: #168fae;
+  --chart-1: #0c97b8;
+  --chart-2: #697bd4;
+  --chart-3: #a771d3;
+  --chart-4: #d082a9;
+  --chart-5: #578ab7;
+}
+
+html:root[data-theme-preset="default"].dark {
+  --background: #050a17;
+  --foreground: #e4eeff;
+  --card: #0b1426;
+  --card-foreground: #e4eeff;
+  --popover: #0d1930;
+  --popover-foreground: #e4eeff;
+  --primary: #5fd9f1;
+  --primary-foreground: #03131f;
+  --secondary: #14233b;
+  --secondary-foreground: #d9e6fa;
+  --muted: #122038;
+  --muted-foreground: #91a7c9;
+  --accent: #172d49;
+  --accent-foreground: #e4eeff;
+  --border: #243958;
+  --input: #30496b;
+  --ring: #56cfe9;
+  --sidebar: #081224;
+  --sidebar-foreground: #dce9ff;
+  --sidebar-primary: #5fd9f1;
+  --sidebar-primary-foreground: #03131f;
+  --sidebar-accent: #162a47;
+  --sidebar-accent-foreground: #e4eeff;
+  --sidebar-border: #243958;
+  --sidebar-ring: #56cfe9;
+  --chart-1: #55d4ee;
+  --chart-2: #7b91e6;
+  --chart-3: #ad8ae5;
+  --chart-4: #d68fb6;
+  --chart-5: #6baed0;
+}
+
+html:root[data-theme-preset="default"] body {
+  --wormhole-glass: var(--sidebar);
+  --wormhole-line: var(--border);
+  background: var(--background);
+}
+
+html:root[data-theme-preset="default"] [data-slot="sidebar-wrapper"] {
+  background: var(--background);
+}
+
+html:root[data-theme-preset="default"] [data-slot="sidebar-inner"] {
+  background-image: linear-gradient(#e4edfaeb, #e4edfaeb), url("/brand/black-hole-universe.png");
+  background-size: auto, auto 100vh;
+  background-position: center, left top;
+  border-color: var(--sidebar-border);
+  box-shadow: inset -1px 0 #ffffff30;
+  backdrop-filter: none;
+}
+
+html:root[data-theme-preset="default"].dark [data-slot="sidebar-inner"] {
+  background-image: linear-gradient(#081224b8, #081224e8), url("/brand/black-hole-universe.png");
+  box-shadow: inset -1px 0 #c7c4a608;
+}
+
+html:root[data-theme-preset="default"] .app-main-surface {
+  background-color: var(--background);
+}
+
+html:root[data-theme-preset="default"] .app-main-surface::before {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(90deg, #edf3fcf7 12%, #edf3fceb 60%, #edf3fcde), url("/brand/black-hole-universe.png") center / cover;
+  animation: none;
+  transform: none;
+  opacity: 1;
+}
+
+html:root[data-theme-preset="default"].dark .app-main-surface::before {
+  background: linear-gradient(90deg, #050a17f2 12%, #050a17d9 60%, #050a17bd), url("/brand/black-hole-universe.png") center / cover;
+}
+
+html:root[data-theme-preset="default"] .app-main-surface::after {
+  content: "";
+  position: fixed;
+  right: -2rem;
+  bottom: -4rem;
+  z-index: 0;
+  width: min(33vw, 32rem);
+  aspect-ratio: 1;
+  pointer-events: none;
+  background: #087d9d;
+  border-radius: 50%;
+  box-shadow: 0 0 80px #40cced33, 0 0 160px #9863e52b;
+  opacity: .025;
+}
+
+html:root[data-theme-preset="default"].dark .app-main-surface::after {
+  background: #5fd9f1;
+  opacity: .035;
+}
+
+html:root[data-theme-preset="default"] .app-topbar {
+  background: var(--card);
+  box-shadow: 0 8px 24px -22px #0b120e70, inset 0 1px #e7e4da10;
+  backdrop-filter: none;
+}
+
+/* Keep the material outside dense data surfaces and sticky action columns. */
+html:root[data-theme-preset="default"] [data-slot="table-container"] {
+  background: var(--card);
+}
+
+@media (max-width: 767px) {
+  html:root[data-theme-preset="default"] .app-main-surface::after {
+    width: 65vw;
+    right: -4rem;
+    opacity: .018;
+  }
+}

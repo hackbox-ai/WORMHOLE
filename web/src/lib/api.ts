@@ -1,0 +1,1387 @@
+import type {FindingReportHistory} from './types';
+import type {TaskResourceList,TaskResourceUsage,TaskResourceItem,TaskResourcePlan,TaskResourceCategory,TaskResourceResult,TaskResourceHistory} from './types';
+import type { AgentCreateInput } from "@/lib/types";
+import {auth} from "@/lib/auth";
+import type {DashboardUsage,MeterFilters,UsageCallPage} from "@/lib/types";
+// Real backend client. /api/* is proxied to the Go backend (next.config rewrites).
+// Returns the domain types in lib/types.ts. Shapes match the backend handlers;
+// a few fields the backend serializes differently (e.g. created_at as a unix int)
+// are passed through and formatted at the call site.
+
+import type { ChatMention } from "@/lib/chat-mentions";
+import type {BusinessModel,BusinessModelDetail,ModelVersion} from "@/lib/business-models";
+import { MOCK } from "@/lib/mock/enabled";
+import { mockHandle } from "@/lib/mock/handler";
+import type {
+  ActiveFindingRetest,
+  Activity,
+  Agent,
+  AgentDetail,
+  AgentTrigger,
+  ArchiveBatchItem,
+  Asset,
+  AssetInterceptRule,
+  AssetInterceptRuleInput,
+  Audit,
+  BatchCategoryItem,
+  BatchControlItem,
+  ChatAttachment,
+  CommandRecord,
+  Company,
+  CompanyScopeMutation,
+  CompanyScopeRule,
+  Conversation,
+  ConvTokenSummary,
+  CoverageAssetRefs,
+  CoverageGraphData,
+  DailyTokenBucket,
+  DeleteTaskOptions,
+  DeleteTaskResult,
+  Edge,
+  EvidenceBodyPreview,
+  ExplorationNodePage,
+  ExplorationNodeQuery,
+  Finding,
+  FindingAssetTree,
+  FindingDeepenResponse,
+  FindingGroupsPage,
+  FindingQuery,
+  FindingRetest,
+  FindingStats,
+  FindingStatus,
+  FindingsPage,
+  FindingTraffic,
+  FindingTrafficDetail,
+  IntentAsset,
+  InterceptApprovalFilter,
+  InterceptApprovalRow,
+  InterceptDetail,
+  InterceptPending,
+  InterceptRule,
+  JudgeConfig,
+  JudgeUsage,
+  LLMPoolStatus,
+  LLMProfile,
+  LLMRecordDetail,
+  LLMRecordItem,
+  LLMRetryOverride,
+  LLMRetryPolicy,
+  LLMTask,
+  MCPServer,
+  MCPTool,
+  MissingSkill,
+  ModelTokenStat,
+  NotificationChannel,
+  NotificationDelivery,
+  NotificationFilter,
+  NotificationMeta,
+  PromptVar,
+  PromptVersion,
+  SessionTokenUsage,
+  Settings,
+  Severity,
+  SkillCall,
+  SkillItem,
+  SSProject,
+  SSTask,
+  Stats,
+  Task,
+  TaskArchive,
+  TaskArchivePage,
+  TaskAssetMutation,
+  TaskAssetScopeMutation,
+  TaskCategory,
+  TaskConstraint,
+  TaskGoal,
+  TaskLLMResolutions,
+  TaskNode,
+  TaskScopeRow,
+  TaskTemplate,
+  TokenTotal,
+  TokenUsage,
+  Tool,
+  ToolStat,
+  TrafficDetail,
+  TrafficEvidenceRef,
+  TrafficEvidenceRole,
+  TrafficHost,
+  TrafficResp,
+  UpdateCheck,
+  UsageStats,
+  WorkspaceTaskUsage,
+  WorkspaceCleanupPlan,
+  WorkspaceCleanupResult,
+  WorkspaceCleanupHistory,
+  WorkspaceFile,
+  WorkspaceListing,
+} from "@/lib/types";
+
+// Older servers/templates may omit fields now used by the task form.
+function normalizeTaskTemplate(template: TaskTemplate): TaskTemplate {
+  return {...template,id:Number(template.id),description:template.description??"",goal:template.goal??"",
+    category_id:template.category_id==null?null:Number(template.category_id),
+    intercept_rules:Array.isArray(template.intercept_rules)?template.intercept_rules:[]};
+}
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return auth.getToken();
+}
+
+export class ApiError extends Error {
+  constructor(message:string,readonly status:number){super(message);this.name="ApiError";}
+}
+
+export async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  if (MOCK) return mockHandle<T>(init?.method ?? "GET", path, init?.body ?? null);
+  const token = getToken();
+  const r = await fetch(`/api${path}`, {
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+  });
+  if (r.status === 401 && path !== "/auth/login" && path !== "/auth/init") {
+    if (typeof window !== "undefined") {
+      auth.clearToken();
+      window.location.href = "/login";
+    }
+    throw new Error("Unauthorized");
+  }
+  if (!r.ok) {
+    const fallback = `${init?.method ?? "GET"} ${path}: ${r.status}`;
+    let message = fallback;
+    try {
+      const payload = (await r.json()) as { error?: unknown; detail?: unknown; request_id?: unknown };
+      if (typeof payload.error === "string" && payload.error.trim()) {
+        message = payload.error.trim();
+        if (r.status === 500 && typeof payload.request_id === "string") {
+          const detail = typeof payload.detail === "string" ? payload.detail : "The service is temporarily unable to process the request.";
+          message = detail + " Request number " + payload.request_id;
+        }
+      }
+    } catch {
+      // Keep the status-based fallback for empty or non-JSON error responses.
+    }
+    throw new ApiError(message,r.status);
+  }
+  if (r.status === 204) return undefined as T;
+  return r.json();
+}
+
+// sseUrl builds a URL for Server-Sent Events streams.
+//
+// Production (static export / Docker): the Go backend serves the web UI *and* the
+// SSE streams on the same port, so we default to a same-origin (relative) URL.
+// This is what makes reverse-proxy deploys work: a page loaded from
+// https://<domain>/ connects to https://<domain>/api/..., which the proxy forwards
+// to the backend — no need to expose :8787 publicly. Hardcoding :8787 here used to
+// break exactly that (https://<domain>:8787/... is unreachable when only 443 is open).
+//
+// Dev (next dev): SSE must NOT go through the Next.js `/api` rewrite — that proxy
+// buffers the streamed response, so event frames never reach the browser (the
+// EventSource opens but receives 0 messages). So in dev only we connect straight
+// to the Go backend on :8787, whose CORS is open.
+//
+// Override either default with NEXT_PUBLIC_SSE_BASE (set it to "" to force same-origin).
+// Token is appended as ?token= because SSE can't carry cookies cross-origin.
+// mockReport returns a canned Markdown report for the demo.
+function mockReport(_task?: string): string {
+  return `# WORMHOLE Penetration Test Report — Acme Corp
+
+## Overview
+- Scope: acme.com (with www/admin/api/shop/vpn subdomain)
+- Confirmed findings: 6 (high risk 3 · medium risk 3 · low risk 2)
+- Engine mode: exploring
+
+## Key findings
+1. **[High] Backend default password** admin.acme.com admin/admin123 → can completely take over the backend.
+2. **[High] SQL Injection** www.acme.com/search?q= → Readable acme_prod library.
+3. **[High] IDOR** api.acme.com/v1/orders?id= → Can read other people’s orders (including mobile phone number/address) without permission.
+4. **[Medium] Reflected XSS**, **Exposed .git source code**, **No login rate limit**.
+
+## Suggestions
+- Force password change in the background + enable MFA and block the default password.
+- search interface parameterized query, output encoding.
+- API adds object-level authorization verification (IDOR) and replaces strong JWT keys.
+
+> (demo) This report is generated from mock data and is only used for interface demonstration.`;
+}
+
+export function sseUrl(path: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_SSE_BASE ??
+    (process.env.NODE_ENV !== "production" && typeof window !== "undefined"
+      ? `${window.location.protocol}//${window.location.hostname}:8787`
+      : "");
+  const token = getToken();
+  const sep = path.includes("?") ? "&" : "?";
+  return token ? `${base}${path}${sep}token=${encodeURIComponent(token)}` : `${base}${path}`;
+}
+
+const get = <T>(p: string) => http<T>(p);
+const post = <T>(p: string, body?: unknown) =>
+  http<T>(p, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+const put = <T>(p: string, body?: unknown) =>
+  http<T>(p, { method: "PUT", body: body ? JSON.stringify(body) : undefined });
+const patch = <T>(p: string, body?: unknown) =>
+  http<T>(p, { method: "PATCH", body: body ? JSON.stringify(body) : undefined });
+const del = <T>(p: string, body?: unknown) =>
+  http<T>(p, { method: "DELETE", body: body ? JSON.stringify(body) : undefined });
+
+// Go serializes nil slices as JSON null — coerce to [].
+const arr = <T>(x: T[] | null | undefined): T[] => x ?? [];
+const tq = (task?: string, sep: "?" | "&" = "?") => (task ? `${sep}task=${encodeURIComponent(task)}` : "");
+
+// findingFilterParams Serialize the filter conditions of the discovery page into query string。List / Grouping /
+// Asset Tree / Exports share the same copy,New filter items can only be changed here(The backend only parses this part)。
+function findingFilterParams(q: Omit<FindingQuery, "page" | "pageSize">): URLSearchParams {
+  const p = new URLSearchParams();
+  if (q.severity && q.severity !== "all") p.set("severity", q.severity);
+  if (q.status && q.status !== "all") p.set("status", q.status);
+  if (q.vulnclass && q.vulnclass !== "all") p.set("vulnclass", q.vulnclass);
+  if (q.task && q.task !== "all") p.set("task_id", q.task);
+  if (q.query?.trim()) p.set("q", q.query.trim());
+  if (q.sort) p.set("sort", q.sort);
+  if (q.assetScope) p.set("asset_scope", q.assetScope);
+  return p;
+}
+
+function interceptPageQuery(page: number, size: number, filter: InterceptApprovalFilter) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (filter.status) query.set("status", filter.status);
+  if (filter.decision_source) query.set("decision_source", filter.decision_source);
+  return query.toString();
+}
+
+export const api = {
+  findingAlerts: (cursor?:string, signal?:AbortSignal) => http<{cursor:string;items:import('@/lib/finding-alerts').FindingNotice[];more:boolean;reset:boolean}>(`/alerts/findings${cursor?'?cursor='+encodeURIComponent(cursor):''}`,{signal,cache:'no-store'}),
+  businessModels: (taskId?: string) => get<{models:BusinessModel[]}>(`/business-models${taskId?`?task_id=${encodeURIComponent(taskId)}`:""}`).then(r=>arr(r.models)),
+  businessModel: (id: string) => get<BusinessModelDetail>(`/business-models/${encodeURIComponent(id)}`),
+  businessModelVersion: (id: string) => get<ModelVersion>(`/business-model-versions/${encodeURIComponent(id)}`),
+  createBusinessModel: (input: {target:string;name?:string;task_id?:number;environment?:string;auth_context?:string;reason?:string}) => post<{task_id:number;system_id:number;created:boolean}>("/business-models",input),
+  controlBusinessModel: (id:string,action:"run"|"pause"|"resume"|"stop"|"retry",taskId?:string) => post<{task_id?:number}>(`/business-models/${encodeURIComponent(id)}/${action}`,taskId?{task_id:Number(taskId)}:{}),
+  exportBusinessModel: async(id:string,format:"json"|"yaml",versionId?:string) => {
+    const token=getToken();
+    const r=await fetch(`/api/business-models/${encodeURIComponent(id)}/export?format=${format}${versionId?`&version_id=${encodeURIComponent(versionId)}`:""}`,{headers:token?{Authorization:`Bearer ${token}`}:{}});
+    if(!r.ok)throw new Error(`Export failed (${r.status}）`);
+    return r.text();
+  },
+  // Backend application version number（release Time ldflags Injection, default "dev"）。
+  health: () => get<{ ok: boolean; service: string; version: string }>("/health"),
+
+  // ---- auth ----
+  authStatus: (signal?:AbortSignal) => http<{ initialized: boolean }>("/auth/status",{signal}),
+  login: (username: string, password: string,signal?:AbortSignal) => http<{token:string}>("/auth/login",{method:"POST",body:JSON.stringify({username,password}),signal:signal??AbortSignal.timeout(15000)}),
+  initPassword: (password: string,signal?:AbortSignal,username?:string) => http<{token:string}>("/auth/init",{method:"POST",body:JSON.stringify({password,...(username===undefined?{}:{username})}),signal:signal??AbortSignal.timeout(15000)}),
+  account:()=>get<{username:string}>("/auth/account"),
+  changeUsername:(username:string,currentPassword:string)=>http<{ok:true;username:string;token:string}>("/auth/account",{method:"PATCH",body:JSON.stringify({username,current_password:currentPassword}),signal:AbortSignal.timeout(15000)}),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    post<{ ok: boolean }>("/auth/change-password", { old_password: oldPassword, new_password: newPassword }),
+
+  downloadNetworkConnector:async(id:string,platform:string)=>{
+    const token=getToken();const r=await fetch('/api/network/channels/'+encodeURIComponent(id)+'/connector?platform='+encodeURIComponent(platform),{headers:token?{Authorization:'Bearer '+token}:{}});
+    if(!r.ok){const e=await r.json().catch(()=>({error:"Download failed"}));throw new Error(e.error||"Download failed");}return r.blob();
+  },
+  // ---- tasks ----
+  tasks: () =>
+    get<{ tasks: Task[]; active: string }>("/tasks").then((r) => ({ tasks: arr(r.tasks), active: r.active ?? "" })),
+  task: (id: string) => get<Task>(`/tasks/${encodeURIComponent(id)}`),
+  createTask: (input: {
+    name?: string;
+    categoryId?: number;
+    description: string;
+    goal: string;
+    llmProfileIds?: number[];
+    sourceTaskIds?: string[];
+    companyIds?: number[];
+    timeoutSeconds?: number;
+    seedFirstIntent?: boolean;
+    planHeartbeatSeconds?: number;
+    coverageEnabled?: boolean;
+    interceptRules?: AssetInterceptRuleInput[];
+    modelingTargets?:string[];
+    network?:{network_mode?:'standard'|'jump';network_channel_id?:number|null};
+  }) =>
+    post<Task>("/tasks", {
+      name: input.name ?? "",
+      category_id: input.categoryId ?? null,
+      description: input.description,
+      goal: input.goal,
+      llm_profile_ids: input.llmProfileIds ?? [],
+      source_task_ids: input.sourceTaskIds ?? [],
+      company_ids: input.companyIds ?? [],
+      timeout_seconds: input.timeoutSeconds ?? 0,
+      seed_first_intent: input.seedFirstIntent ?? false,
+      plan_heartbeat_seconds: input.planHeartbeatSeconds ?? 0, // 0 = Backend normalized to default 600(10min)
+      coverage_enabled: input.coverageEnabled ?? true, // On by default;false=Turn off asset coverage function
+      intercept_rules: input.interceptRules ?? [], // Task-level asset interception rules
+      modeling_targets: input.modelingTargets ?? [],
+      ...input.network,
+    }),
+  taskCategories: () => get<{ categories: TaskCategory[] }>("/task-categories").then((r) => arr(r.categories)),
+  updateTask: (id: string, input: { name?: string; pinned?: boolean }) => patch<Task>(`/tasks/${id}`, input),
+  renameTask: (id: string, name: string) => patch<Task>(`/tasks/${id}`, { name }),
+  pinTask: (id: string, pinned: boolean) => patch<Task>(`/tasks/${id}`, { pinned }),
+  createTaskCategory: (name: string) => post<TaskCategory>("/task-categories", { name }),
+  renameTaskCategory: (id: number, name: string) => patch<TaskCategory>(`/task-categories/${id}`, { name }),
+  deleteTaskCategory: (id: number) => del<{ deleted: number }>(`/task-categories/${id}`),
+  updateTaskCategory: (taskId: string, categoryId?: number) =>
+    patch<Task>(`/tasks/${taskId}/category`, { category_id: categoryId ?? null }),
+  // categoryId Omitted/undefined = Move out of category (backend receives null）
+  updateTasksCategory: (taskIds: string[], categoryId?: number) =>
+    post<{ items: BatchCategoryItem[]; category: TaskCategory | null }>("/tasks/category/batch", {
+      task_ids: taskIds,
+      category_id: categoryId ?? null,
+    }),
+  taskTemplates: () => get<{ templates: TaskTemplate[] }>("/task-templates").then((r) => arr(r.templates).map(normalizeTaskTemplate)),
+  createTaskTemplate: (
+    input: Pick<TaskTemplate, "name" | "description" | "goal" | "category_id" | "intercept_rules">,
+  ) => post<TaskTemplate>("/task-templates", input).then(normalizeTaskTemplate),
+  updateTaskTemplate: (
+    id: number,
+    input: Partial<Pick<TaskTemplate, "name" | "description" | "goal" | "category_id" | "intercept_rules">>,
+  ) => patch<TaskTemplate>(`/task-templates/${id}`, input).then(normalizeTaskTemplate),
+  deleteTaskTemplate: (id: number) => del<{ deleted: number }>(`/task-templates/${id}`),
+  updateTaskLLMProfiles: (id: string, llmProfileIds: number[], activeLLMProfileId?: number) =>
+    put<{
+      id: string;
+      llm_profile_ids: number[];
+      active_llm_profile_id?: number;
+      llm_failover_state: string;
+      reopened_intents: number;
+      switch_event?: Activity;
+    }>(`/tasks/${id}/llm`, {
+      llm_profile_ids: llmProfileIds,
+      active_llm_profile_id: activeLLMProfileId ?? null,
+    }),
+  deleteTask: (id: string, options: DeleteTaskOptions) => del<DeleteTaskResult>(`/tasks/${id}`, options),
+  controlTask: (id: string, action: "pause" | "resume") =>
+    post<{ id: string; paused: boolean; queued: boolean; status: string }>(`/tasks/${id}/control`, { action }),
+  controlTasksBatch: (taskIds: string[], action: "pause" | "resume") =>
+    post<{ items: BatchControlItem[] }>("/tasks/control/batch", { task_ids: taskIds, action }),
+  taskArchives: (input?: { page?: number; size?: number; q?: string; state?: string }) => {
+    const query = new URLSearchParams();
+    query.set("page", String(input?.page ?? 1));
+    query.set("size", String(input?.size ?? 20));
+    if (input?.q) query.set("q", input.q);
+    if (input?.state) query.set("state", input.state);
+    return get<TaskArchivePage>(`/task-archives?${query.toString()}`).then((response) => ({
+      ...response,
+      items: arr(response.items),
+    }));
+  },
+  taskArchive: (id: number) => get<TaskArchive>(`/task-archives/${id}`),
+  archiveTask: (id: string) => post<TaskArchive>(`/tasks/${id}/archive`),
+  archiveTasks: (taskIds: string[]) =>
+    post<{ items: ArchiveBatchItem[] }>("/tasks/archive/batch", { task_ids: taskIds }),
+  restoreTaskArchive: (id: number) => post<TaskArchive>(`/task-archives/${id}/restore`),
+  restoreTaskArchives: (archiveIds: number[]) =>
+    post<{ items: ArchiveBatchItem[] }>("/task-archives/restore/batch", { archive_ids: archiveIds }),
+  deleteTaskArchive: (id: number) => del<TaskArchive>(`/task-archives/${id}`),
+  deleteTaskArchives: (archiveIds: number[]) =>
+    post<{ items: ArchiveBatchItem[] }>("/task-archives/delete/batch", { archive_ids: archiveIds }),
+  controlIntent: (
+    taskId: string,
+    intentId: string,
+    action: "pause" | "resume" | "cancel",
+    reason?: string,
+    // cancel Dedicated:soft(Default,False delete,Intent setting deleted + Note the reason for deletion)| hard(True delete,Cascade removal of exclusive descendants)。
+    mode?: "soft" | "hard",
+  ) =>
+    post<{
+      id: number;
+      state: "paused" | "open" | "deleted" | "";
+      deleted?: { intents: number; facts: number; findings: number; activities: number };
+    }>(`/tasks/${taskId}/intents/${intentId}/control`, { action, reason: reason ?? "", mode: mode ?? "soft" }),
+  sendWorkerMessage: (taskId: string, intentId: string, message: string, requestId: string) =>
+    post<{
+      id: number;
+      state: "running";
+      accepted: true;
+      request_id: string;
+    }>(`/tasks/${taskId}/intents/${intentId}/messages`, { message, request_id: requestId }),
+  taskLLMResolution: (id: string) => get<TaskLLMResolutions>(`/tasks/${id}/llm/resolution`),
+  // The intention of re-running an unsuccessful run(blocked/exhausted/stopped)：Reset open，worker Will claim again and run again from the beginning。
+  rerunIntent: (taskId: string, intentId: string) =>
+    post<{ id: string; reopened: number }>(`/tasks/${taskId}/intents/${intentId}/rerun`),
+  // Rerun all tasks in batches blocked Intent (once network/LLM Disconnection leads to multiple blocked Retry all with one click）。
+  rerunBlocked: (taskId: string) => post<{ id: string; reopened: number }>(`/tasks/${taskId}/intents/rerun-blocked`),
+  setActive: (id: string) => post<{ active: string }>("/active", { id }),
+  // ---- stats ----
+  stats: (task?: string) => get<Stats>(`/stats${tq(task)}`),
+  // Asset Test Coverage(Rough estimate, for reference only)：Assets within the scope are fact Proportion of touched + Total by type/Tested。
+  taskCoverage: (id: string) =>
+    get<{
+      enabled: boolean; // Is the asset coverage function enabled?；false when the remaining fields have zero values
+      scope_rows: number;
+      denominator: number;
+      tested: number;
+      pct: number | null;
+      by_type: { type: string; total: number; tested: number }[];
+    }>(`/tasks/${id}/coverage`),
+  // Asset coverage map: all assets within the scope + Root domain name for connection/Company node, including tested/in_scope。
+  taskCoverageGraph: (id: string) => get<CoverageGraphData>(`/tasks/${id}/coverage-graph`),
+  // Global llm_usage Aggregation (new version of dashboard token View): Press profile Total amount + Buckets by day。
+  usageStats: (days=30,filters:MeterFilters={profile:"all",source:"all",task:""},signal?:AbortSignal) =>
+    http<DashboardUsage>("/tokens/usage?"+new URLSearchParams({days:String(days),...filters}),{signal}),
+  usageCalls: (days:number,filters:MeterFilters,page=1,signal?:AbortSignal) =>
+    http<UsageCallPage>("/tokens/usage/calls?"+new URLSearchParams({days:String(days),...filters,page:String(page),page_size:"25"}),{signal}),
+  // ---- Management by Objectives (Overview）----
+  // All objectives of this mission（text/vulnclass/state）。
+  taskGoals: (id: string) =>
+    get<{ goals: TaskGoal[] | null }>(`/tasks/${id}/goals`).then((response) => ({ goals: arr(response.goals) })),
+  // Manually add a target: write to the map and notify planner、Resurrection mission。
+  addGoal: (id: string, text: string, vulnclass?: string) =>
+    post<TaskGoal>(`/tasks/${id}/goals`, { text, vulnclass: vulnclass ?? "" }),
+  // Manually modify the target text (and vulnclass）：Notice planner「By old becomes new」、Resurrection mission。
+  updateGoal: (id: string, goalId: string, text: string, vulnclass?: string) =>
+    patch<TaskGoal>(`/tasks/${id}/goals/${goalId}`, { text, vulnclass: vulnclass ?? "" }),
+  // Manual deletion of target (hard deletion): Notification planner，Delete non-resurrection tasks。
+  deleteGoal: (id: string, goalId: string) => del<{ ok: boolean }>(`/tasks/${id}/goals/${goalId}`),
+
+  // ---- Operational Constraint Management (Overview）----
+  // All operational constraints of this task（allow/deny）。
+  taskConstraints: (id: string) =>
+    get<{ constraints: TaskConstraint[] | null }>(`/tasks/${id}/constraints`).then((response) => ({
+      constraints: arr(response.constraints),
+    })),
+  // New constraints (no notification planner，The next round of planning will naturally read）。
+  addConstraint: (id: string, text: string, kind: TaskConstraint["kind"]) =>
+    post<TaskConstraint>(`/tasks/${id}/constraints`, { text, kind }),
+  // Modify Constraints (text + allow/deny）。
+  updateConstraint: (id: string, constraintId: string, text: string, kind: TaskConstraint["kind"]) =>
+    patch<TaskConstraint>(`/tasks/${id}/constraints/${constraintId}`, { text, kind }),
+  // Delete constraints。
+  deleteConstraint: (id: string, constraintId: string) =>
+    del<{ ok: boolean }>(`/tasks/${id}/constraints/${constraintId}`),
+
+  // ---- Task level asset interception/Allow Rules (Overview）----
+  taskInterceptRules: (id: string) =>
+    get<{ rules: AssetInterceptRule[] | null }>(`/tasks/${id}/intercept-rules`).then((r) => arr(r.rules)),
+  createTaskInterceptRule: (id: string, rule: AssetInterceptRuleInput) =>
+    post<AssetInterceptRule>(`/tasks/${id}/intercept-rules`, rule),
+  updateTaskInterceptRule: (id: string, ruleId: number, rule: AssetInterceptRuleInput) =>
+    put<AssetInterceptRule>(`/tasks/${id}/intercept-rules/${ruleId}`, rule),
+  deleteTaskInterceptRule: (id: string, ruleId: number) =>
+    del<{ deleted: boolean }>(`/tasks/${id}/intercept-rules/${ruleId}`),
+  toggleTaskInterceptRule: (id: string, ruleId: number, enabled: boolean) =>
+    post<{ ok: boolean; enabled: boolean }>(`/tasks/${id}/intercept-rules/${ruleId}/toggle`, { enabled }),
+
+  // List of test scopes for this task (including scopes inherited from the source task）。
+  taskScope: (id: string) => get<{ scope: TaskScopeRow[] }>(`/tasks/${id}/scope`),
+  // Manually add a test range（kind=company/root_domain/subdomain/ip/cidr）。
+  addTaskScope: (id: string, kind: string, value: string, reason?: string) =>
+    post<TaskScopeRow>(`/tasks/${id}/scope`, { kind, value, reason }),
+  // Delete a test range of this task。
+  deleteTaskScope: (id: string, scopeId: number) => del<{ ok: boolean }>(`/tasks/${id}/scope/${scopeId}`),
+  // The intention to associate an asset in this task / Facts / Discovery (overlay node drawer for）。
+  taskAssetRefs: (id: string, assetId: number) => get<CoverageAssetRefs>(`/tasks/${id}/asset-refs?asset_id=${assetId}`),
+
+  // ---- workspace file manager (workDir) ----
+  workspaceResources:()=>get<TaskResourceList>('/workspace/resources'),
+  workspaceResourceDetail:(task_id:number)=>get<TaskResourceUsage&{items:TaskResourceItem[]}>('/workspace/resource-detail?task_id='+task_id),
+  workspaceResourcePreview:(task_id:number,categories:TaskResourceCategory[])=>post<TaskResourcePlan>('/workspace/resource-preview',{task_id,categories}),
+  workspaceResourceCleanup:(token:string)=>post<TaskResourceResult>('/workspace/resource-cleanup',{token}),
+  workspaceResourceHistory:()=>get<{items:TaskResourceHistory[]}>('/workspace/resource-history'),
+  workspaceTasks:()=>get<{tasks:WorkspaceTaskUsage[];bytes:number;disk_bytes:number;file_count:number;scanned_at:number}>("/workspace/tasks"),
+  workspaceCleanupPreview:(paths:string[])=>post<WorkspaceCleanupPlan>("/workspace/cleanup-preview",{paths}),
+  workspaceCleanup:(token:string)=>post<WorkspaceCleanupResult>("/workspace/cleanup",{token}),
+  workspaceCleanupHistory:()=>get<{items:WorkspaceCleanupHistory[]}>("/workspace/cleanup-history"),
+  workspaceList: (path = "") => get<WorkspaceListing>(`/workspace/list?path=${encodeURIComponent(path)}`),
+  workspaceRead: (path: string) => get<WorkspaceFile>(`/workspace/read?path=${encodeURIComponent(path)}`),
+  workspaceWrite: (path: string, content: string) =>
+    post<{ ok: boolean; path: string }>(`/workspace/write`, { path, content }),
+  workspaceMkdir: (path: string) => post<{ ok: boolean; path: string }>(`/workspace/mkdir`, { path }),
+  workspaceDelete: (path: string) => del<{ ok: boolean }>(`/workspace/delete?path=${encodeURIComponent(path)}`),
+  workspaceUpload: async (dir: string, files: File[]) => {
+    if (MOCK) return { uploaded: files.length };
+    const fd = new FormData();
+    for (const f of files) fd.append("file", f);
+    const token = getToken();
+    const r = await fetch(`/api/workspace/upload?path=${encodeURIComponent(dir)}`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: fd,
+    });
+    if (!r.ok) throw new Error(`Upload failed:
+Example download content for ${r.status}`);
+    return r.json() as Promise<{ uploaded: number }>;
+  },
+  workspaceDownload: async (path: string) => {
+    let blob: Blob;
+    if (MOCK) {
+      blob = new Blob([`（demo）${path} .`], { type: "text/plain" });
+    } else {
+      const token = getToken();
+      const r = await fetch(`/api/workspace/download?path=${encodeURIComponent(path)}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+      blob = await r.blob();
+    }
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = path.split("/").pop() || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+  },
+
+  // ---- assets ----
+  // Server-side paginated: pass limit/offset, get back the page + full match total.
+  assets: (type = "", limit = 50, offset = 0) =>
+    get<{ count: number; total: number; assets: Asset[] }>(`/assets?type=${type}&limit=${limit}&offset=${offset}`).then(
+      (r) => ({ assets: r?.assets ?? [], total: r?.total ?? r?.count ?? 0 }),
+    ),
+  searchAssets: (dsl: string, type = "", limit = 50, offset = 0) =>
+    get<{ count: number; total: number; assets: Asset[] }>(
+      `/assets?dsl=${encodeURIComponent(dsl)}${type ? `&type=${encodeURIComponent(type)}` : ""}&limit=${limit}&offset=${offset}`,
+    ).then((r) => ({ assets: r?.assets ?? [], total: r?.total ?? r?.count ?? 0 })),
+  assetCounts: (taskId = "") =>
+    get<Record<string, number>>(`/assets/counts${taskId ? `?task_id=${encodeURIComponent(taskId)}` : ""}`),
+  deleteAssets: (ids: number[]) =>
+    http<{ deleted: number }>("/assets", { method: "DELETE", body: JSON.stringify({ ids }) }),
+  // task-scoped view of the same endpoint — server-side paginated like `assets`
+  taskAssets: (taskId: string, type = "", limit = 50, offset = 0) =>
+    get<{ count: number; total: number; assets: Asset[] }>(
+      `/assets?task_id=${encodeURIComponent(taskId)}&type=${encodeURIComponent(type)}&limit=${limit}&offset=${offset}`,
+    ).then((r) => ({ assets: r?.assets ?? [], total: r?.total ?? r?.count ?? 0 })),
+  // DSL search scoped to a task — the backend forces the task_id filter, so it
+  // always stays within that task's assets (same DSL grammar as `searchAssets`).
+  searchTaskAssets: (taskId: string, dsl: string, type = "", limit = 50, offset = 0) =>
+    get<{ count: number; total: number; assets: Asset[] }>(
+      `/assets?task_id=${encodeURIComponent(taskId)}&dsl=${encodeURIComponent(dsl)}&type=${encodeURIComponent(type)}&limit=${limit}&offset=${offset}`,
+    ).then((r) => ({ assets: r?.assets ?? [], total: r?.total ?? r?.count ?? 0 })),
+  attachTaskAssets: (taskId: string, assetIds: number[], sourceSummary: string) =>
+    post<TaskAssetMutation>(`/tasks/${taskId}/assets`, {
+      asset_ids: assetIds,
+      source_summary: sourceSummary,
+    }),
+  registerTaskAssetScopes: (taskId: string, scope: CompanyScopeRule[]) =>
+    post<TaskAssetScopeMutation>(`/tasks/${taskId}/assets`, { scope }),
+  detachTaskAsset: (taskId: string, assetId: number) => del<{ detached: number }>(`/tasks/${taskId}/assets/${assetId}`),
+  taskIntentAssets: (taskId: string) =>
+    get<{ assets: IntentAsset[] }>(`/tasks/${taskId}/intent-assets`).then((r) => arr(r.assets)),
+
+  // ---- companies (Enterprise + Asset scope; sole source of attribution) ----
+  companies: () => get<Company[]>("/companies").then(arr),
+  createCompany: (name: string, scope: CompanyScopeRule[]) =>
+    post<{ id: number; created: boolean; scope_added?: number; scope_invalid?: number; scope_errors?: string[] }>(
+      "/companies",
+      {
+        name,
+        scope,
+      },
+    ),
+  addCompanyScope: (id: number, scope: CompanyScopeRule[], reason = "") =>
+    post<CompanyScopeMutation>(`/companies/${id}/scope`, {
+      scope,
+      reason,
+    }),
+  updateCompanyScope: (id: number, scope: CompanyScopeRule[], reason = "") =>
+    post<CompanyScopeMutation>(`/companies/${id}/scope`, {
+      scope,
+      reason,
+      reset: true,
+    }),
+  deleteCompany: (id: number, deleteAssets = false) =>
+    http<{ deleted: number; assets_deleted: number }>(`/companies/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify({ delete_assets: deleteAssets }),
+    }),
+
+  // ---- exploration (per task) ----
+  frontier: (task?: string) => get<TaskNode[]>(`/exploration/frontier${tq(task)}`).then(arr),
+  findings: (task?: string) => get<Finding[]>(`/exploration/findings${tq(task)}`).then(arr),
+  findingsPage: (q: FindingQuery) => {
+    const p = findingFilterParams(q);
+    p.set("page", String(q.page));
+    p.set("limit", String(q.pageSize));
+    return get<FindingsPage>(`/exploration/findings?${p.toString()}`);
+  },
+  findingGroups: (q: FindingQuery) => {
+    const p = findingFilterParams(q);
+    p.set("page", String(q.page));
+    p.set("limit", String(q.pageSize));
+    return get<FindingGroupsPage>(`/exploration/findings/groups?${p.toString()}`);
+  },
+  // findingAssetTree Take the left tree of the ”By Asset” view:Contains only discovered assets and their ancestors,
+  // Node with subtree aggregate count. No pagination - the tree is a navigation structure,Take it all at once。
+  findingAssetTree: (q: Omit<FindingQuery, "page" | "pageSize">) =>
+    get<FindingAssetTree>(`/exploration/findings/asset-tree?${findingFilterParams(q).toString()}`),
+  findingStats: () => get<FindingStats>("/exploration/findings/stats"),
+  // exportFindings Trigger discovery page export and download files。scope=selected Time Biography ids(finding_id List);
+  // scope=filtered Time pass current filter(Inherited Filter field for FindingQuery filter field);scope=all Ignore filtering。
+  exportFindings: async (opts: {
+    format: "md-single" | "md-zip" | "csv" | "json";
+    scope: "filtered" | "all" | "selected";
+    filters?: Omit<FindingQuery, "page" | "pageSize">;
+    ids?: string[];
+  }) => {
+    const p = new URLSearchParams({ format: opts.format, scope: opts.scope });
+    if (opts.scope === "selected") {
+      p.set("ids", (opts.ids ?? []).join(","));
+    } else if (opts.scope === "filtered" && opts.filters) {
+      for (const [k, v] of findingFilterParams(opts.filters)) p.set(k, v);
+    }
+    const token = getToken();
+    const r = await fetch(`/api/exploration/findings/export?${p.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error(`export: ${r.status}`);
+    const blob = await r.blob();
+    // The file name takes priority from the backend Content-Disposition,If not available, use the default name.。
+    const disp = r.headers.get("Content-Disposition") ?? "";
+    const m = disp.match(/filename="?([^"]+)"?/);
+    const filename = m?.[1] ?? `findings-export`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+  backfillFindingReports:(finding_ids:number[],dry_run=true)=>post<{eligible?:number;items:unknown[]}>('/finding-reports/backfill',{finding_ids,dry_run}),
+  findingReportHistory:(id:string)=>get<FindingReportHistory>("/exploration/findings/"+id+"/report"),
+  retryFindingReport:(id:string)=>post<{created:boolean}>("/exploration/findings/"+id+"/report/retry",{}),
+  cancelFindingReport:(id:string)=>post<{cancelled:number}>("/exploration/findings/"+id+"/report/cancel",{}),
+  findingReportVersion:(id:string,version:string)=>get<{body:string}>("/exploration/findings/"+id+"/report/versions/"+version),
+  getFinding: (id: string, contextTaskId?: string) =>
+    get<Finding>(
+      `/exploration/findings/${id}${contextTaskId ? `?context_task=${encodeURIComponent(contextTaskId)}` : ""}`,
+    ),
+  findingTraffic: (id: string, contextTask?: string) =>
+    get<FindingTraffic>(
+      `/exploration/findings/${id}/traffic${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+    ),
+  bindFindingTraffic: (id: string, traffic_refs: TrafficEvidenceRef[], contextTask?: string) =>
+    post<FindingTraffic>(
+      `/exploration/findings/${id}/traffic${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+      { traffic_refs },
+    ),
+  editFindingTraffic: (
+    id: string,
+    bindingId: string,
+    version: number,
+    fields: { role: TrafficEvidenceRole; note: string },
+    contextTask?: string,
+  ) =>
+    patch<FindingTraffic>(
+      `/exploration/findings/${id}/traffic/${bindingId}${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+      { version, ...fields },
+    ),
+  removeFindingTraffic: (id: string, bindingId: string, version: number, contextTask?: string) =>
+    del<FindingTraffic>(
+      `/exploration/findings/${id}/traffic/${bindingId}${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+      { version },
+    ),
+  orderFindingTraffic: (id: string, binding_ids: string[], version: number, contextTask?: string) =>
+    http<FindingTraffic>(
+      `/exploration/findings/${id}/traffic/order${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+      { method: "PUT", body: JSON.stringify({ binding_ids, version }) },
+    ),
+  findingTrafficDetail: (id: string, bindingId: string, contextTask?: string) =>
+    get<FindingTrafficDetail>(
+      `/exploration/findings/${id}/traffic/${bindingId}${contextTask ? `?context_task=${encodeURIComponent(contextTask)}` : ""}`,
+    ),
+  findingTrafficBody: (
+    id: string,
+    bindingId: string,
+    side: "request" | "response",
+    offset: number,
+    contextTask?: string,
+  ) =>
+    get<EvidenceBodyPreview>(
+      `/exploration/findings/${id}/traffic/${bindingId}/body?side=${side}&offset=${offset}${contextTask ? `&context_task=${encodeURIComponent(contextTask)}` : ""}`,
+    ),
+  downloadFindingTrafficBody: async (
+    id: string,
+    bindingId: string,
+    side: "request" | "response",
+    contextTask?: string,
+  ) => {
+    const token = getToken();
+    const response = await fetch(
+      `/api/exploration/findings/${id}/traffic/${bindingId}/body?side=${side}&download=1${contextTask ? `&context_task=${encodeURIComponent(contextTask)}` : ""}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Download failed" }));
+      throw new Error(error.error ?? "Download failed");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `evidence-${bindingId}-${side}.bin`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+  // Vulnerable link:The vulnerability node traces back to the subgraph of the task initial node(Node + Relationship)。
+  findingLineage: (id: string) => get<{ nodes: TaskNode[]; edges: Edge[] }>(`/exploration/findings/${id}/lineage`),
+  setFindingStatus: (id: string, status: FindingStatus) => patch<Finding>(`/exploration/findings/${id}`, { status }),
+  setFindingSeverity: (id: string, severity: Severity) => patch<Finding>(`/exploration/findings/${id}`, { severity }),
+  // Save vulnerability name once/Category/Severity level(Found list for inline editing),Only pass the fields that appear。
+  updateFinding: (
+    id: string,
+    fields: { name?: string; vulnclass?: string; severity?: Severity; status?: FindingStatus },
+  ) => patch<Finding>(`/exploration/findings/${id}`, fields),
+  // Delete vulnerability:Remove findings Record + Source exploration node(From discovery list/Task Discovery Tab/The exploration map disappears together)。
+  deleteFinding: (id: string) => del<{ deleted: boolean; id: number }>(`/exploration/findings/${id}`),
+  findingRetests: (id: string) =>
+    get<{ retests: FindingRetest[] }>(`/exploration/findings/${encodeURIComponent(id)}/retests`).then((r) =>
+      arr(r.retests),
+    ),
+  activeFindingRetests: () =>
+    get<{ retests: ActiveFindingRetest[] }>("/exploration/findings/retests/active").then((r) => arr(r.retests)),
+  startFindingRetest: (id: string, notes: string) =>
+    post<{ retest: FindingRetest; created: boolean }>(`/exploration/findings/${encodeURIComponent(id)}/retests`, {
+      notes,
+    }),
+  deepenFinding: (id: string, description: string) =>
+    post<FindingDeepenResponse>(`/exploration/findings/${id}/deepen`, { description }),
+  intents: (task?: string) => get<TaskNode[]>(`/exploration/intents${tq(task)}`).then(arr),
+  tokenStats: (task?: string) =>
+    get<{ workers: TokenUsage[]; sessions: SessionTokenUsage[]; total: TokenTotal }>(
+      `/exploration/tokens${tq(task)}`,
+    ).then((r) => ({
+      workers: arr(r.workers),
+      sessions: arr(r.sessions),
+      total: r.total,
+    })),
+  tokenDaily: (days = 30) => get<DailyTokenBucket[]>(`/tokens/daily?days=${days}`).then(arr),
+  conversationTokens: () =>
+    get<ConvTokenSummary[]>("/tokens/conversations")
+      .then(arr)
+      .catch(() => [] as ConvTokenSummary[]),
+  explorationGraph: (task?: string) => get<{ nodes: TaskNode[]; edges: Edge[] }>(`/exploration/graph${tq(task)}`),
+  // Announcement board:Exploration nodes paginated by the server in the order of creation(Default latest first)。
+  explorationNodes: (task: string, query: ExplorationNodeQuery = {}) => {
+    const q = new URLSearchParams();
+    if (task) q.set("task", task);
+    q.set("page", String(query.page ?? 1));
+    q.set("size", String(query.size ?? 20));
+    if (query.kinds?.length) q.set("kind", query.kinds.join(","));
+    if (query.states?.length) q.set("state", query.states.join(","));
+    if (query.q?.trim()) q.set("q", query.q.trim());
+    if (query.order === "asc") q.set("order", "asc");
+    return get<ExplorationNodePage>(`/exploration/nodes?${q.toString()}`).then((r) => ({
+      items: arr(r.items),
+      total: r.total ?? 0,
+      page: r.page ?? 1,
+      size: r.size ?? query.size ?? 20,
+      edges: arr(r.edges),
+      refs: r.refs ?? {},
+      assets: r.assets ?? {},
+    }));
+  },
+  activity: (task?: string, opts?: { intent?: string; since?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (task) q.set("task", task);
+    if (opts?.intent) q.set("intent", opts.intent);
+    if (opts?.since) q.set("since", String(opts.since));
+    if (opts?.limit) q.set("limit", String(opts.limit));
+    return get<{ items: Activity[]; cursor: number }>(`/exploration/activity?${q.toString()}`).then((r) => ({
+      items: arr(r.items),
+      cursor: r.cursor ?? 0,
+    }));
+  },
+  activityDetail: (id: number, task?: string) => get<{ detail: string }>(`/exploration/activity/${id}${tq(task)}`),
+  // Reverse-paginated session history. session = "main" | "plan" | "intent:<id>".
+  // before=0 → latest page; before=<id> → the older page ending before that id.
+  // snapshotCursor is the TASK-level max id at query time — open the task SSE at
+  // since=snapshotCursor so history (id≤cursor) and the live tail (id>cursor) meet
+  // gap-free. hasMore = still-older steps exist (drives scroll-up loading).
+  activityHistory: (task: string, session: string, before = 0, limit = 200) => {
+    const q = new URLSearchParams({ session, limit: String(limit) });
+    if (task) q.set("task", task);
+    if (before > 0) q.set("before", String(before));
+    return get<{ items: Activity[]; snapshot_cursor: number; earliest_cursor: number; has_more: boolean }>(
+      `/exploration/activity/history?${q.toString()}`,
+    ).then((r) => ({
+      items: arr(r.items),
+      snapshotCursor: r.snapshot_cursor ?? 0,
+      earliestCursor: r.earliest_cursor ?? 0,
+      hasMore: !!r.has_more,
+    }));
+  },
+  // Paged worker (intent) session list — reaches past the legacy fixed 300 cap.
+  // before=0 → newest page; before=<id> → older page. has_more = older intents exist.
+  intentsPage: (task: string, before = 0, limit = 300) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (task) q.set("task", task);
+    q.set("before", String(before > 0 ? before : 0));
+    q.set("page", "1"); // marker so the backend returns the paged {items,has_more} shape
+    return get<{ items: TaskNode[]; has_more: boolean }>(`/exploration/intents?${q.toString()}`).then((r) => ({
+      items: arr(r.items),
+      hasMore: !!r.has_more,
+    }));
+  },
+
+  // Main-agent conversation segments of a task. Each segment is a resettable session
+  // (clean transcript/context) over the same task; `current` is the writable one.
+  mainSessions: (task: string) =>
+    get<{ sessions: { seq: number; created_at: string }[]; current: number }>(
+      `/exploration/main-sessions${tq(task)}`,
+    ).then((r) => ({ sessions: arr(r.sessions), current: r.current ?? 0 })),
+  // Start a fresh main-agent session segment (does not touch the task's graph/assets/goal).
+  newMainSession: (task: string) =>
+    post<{ seq: number; created_at: string; current: number }>(`/exploration/main-session/new${tq(task)}`),
+
+  // ---- traffic / audit / report / chat ----
+  audit: (task?: string) => get<Audit>(`/audit${tq(task)}`),
+  traffic: (
+    page = 0,
+    size = 100,
+    host = "",
+    method = "",
+    q = "",
+    opts: {
+      body?: string;
+      path?: string;
+      status?: string;
+      respMin?: string;
+      respMax?: string;
+      sort?: string;
+      order?: string;
+    } = {},
+  ) =>
+    get<TrafficResp>(
+      `/traffic?page=${page}&size=${size}` +
+        (host ? `&host=${encodeURIComponent(host)}` : "") +
+        (method && method !== "all" ? `&method=${encodeURIComponent(method)}` : "") +
+        (q ? `&q=${encodeURIComponent(q)}` : "") +
+        (opts.body ? `&body=${encodeURIComponent(opts.body)}` : "") +
+        (opts.path ? `&path=${encodeURIComponent(opts.path)}` : "") +
+        (opts.status && opts.status !== "all" ? `&status=${encodeURIComponent(opts.status)}` : "") +
+        (opts.respMin ? `&resp_min=${encodeURIComponent(opts.respMin)}` : "") +
+        (opts.respMax ? `&resp_max=${encodeURIComponent(opts.respMax)}` : "") +
+        (opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : "") +
+        (opts.order ? `&order=${encodeURIComponent(opts.order)}` : ""),
+    ),
+  trafficExchange: (id: string) => get<TrafficDetail>(`/traffic/exchange?id=${encodeURIComponent(id)}`),
+  trafficHosts: () => get<{ hosts: TrafficHost[] }>(`/traffic/hosts`),
+  trafficDeleteHost: (host: string) => del<{ deleted: number }>(`/traffic?host=${encodeURIComponent(host)}`),
+  trafficDeleteHosts: (hosts: string[]) => del<{ deleted: number }>(`/traffic/hosts`, { hosts }),
+  // Purges every exchange and compacts the index; `reclaimed` is the bytes of
+  // index handed back to the filesystem. Evidence bound to findings is kept.
+  trafficDeleteAll: () => del<{ deleted: number; reclaimed: number }>(`/traffic/all`),
+
+  // ---- app settings (runtime toggles) ----
+  settings: () => get<Settings>(`/settings`),
+  setSettings: (patch: Partial<Settings>) => put<Settings>(`/settings`, patch),
+  // Run a real "test" search with the given (or saved) config to verify it works.
+  testWebSearch: (patch: {
+    web_search_backend?: string;
+    web_search_proxy?: string;
+    brave_search_api_key?: string;
+    tavily_search_api_key?: string;
+  }) => post<{ ok: boolean; error?: string; count?: number; backend?: string }>(`/settings/web-search/test`, patch),
+
+  // ---- Finding IM Push ----
+  // Channels are multi-instance resources (the same type can be equipped with multiple robots, each with its own filtering rules), so they are grouped independently.，
+  // Not stuffed flat settings in key value。
+  emailAlerts: () => get<{channel:NotificationChannel|null;global_enabled:boolean;public_base_url:string}>('/notify/email-alerts'),
+  saveEmailAlerts: (payload:{enabled:boolean;config:Record<string,unknown>;public_base_url:string}) =>
+    put<{channel:NotificationChannel|null;global_enabled:boolean;public_base_url:string}>('/notify/email-alerts',payload),
+  notifyMeta: () => get<NotificationMeta>(`/notify/meta`),
+  notifyChannels: () =>
+    get<{ channels: NotificationChannel[] }>(`/notify/channels`).then((r) => arr(r.channels)),
+  notifyCreateChannel: (payload: {
+    name: string;
+    kind: string;
+    enabled?: boolean;
+    mode?: string;
+    config: Record<string, unknown>;
+    filter?: NotificationFilter;
+    rate_per_min?: number;
+  }) => post<{ id: number }>(`/notify/channels`, payload),
+  // PATCH Semantics: Only submit the fields to be changed。config Returning the mask value as it is means ”Keep the original value.」。
+  notifyUpdateChannel: (
+    id: number,
+    payload: {
+      name?: string;
+      kind?: string;
+      enabled?: boolean;
+      mode?: string;
+      config?: Record<string, unknown>;
+      filter?: NotificationFilter;
+      rate_per_min?: number;
+    },
+  ) => patch<{ id: number }>(`/notify/channels/${id}`, payload),
+  notifyDeleteChannel: (id: number) => del<{ ok: boolean }>(`/notify/channels/${id}`),
+  // Send a test message synchronously; when it fails, the backend will return the original error of the channel for troubleshooting and configuration.。
+  notifyTestChannel: (id: number) => post<{ ok: boolean; latency_ms: number }>(`/notify/channels/${id}/test`),
+  notifyDeliveries: (q: { channelId?: number; state?: string; page?: number; pageSize?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (q.channelId) p.set("channel_id", String(q.channelId));
+    if (q.state) p.set("state", q.state);
+    p.set("page", String(q.page ?? 1));
+    p.set("page_size", String(q.pageSize ?? 50));
+    return get<{ deliveries: NotificationDelivery[]; total: number; page: number; page_size: number }>(
+      `/notify/deliveries?${p.toString()}`,
+    ).then((r) => ({ ...r, deliveries: arr(r.deliveries) }));
+  },
+  notifyRetryDelivery: (id: number) => post<{ ok: boolean }>(`/notify/deliveries/${id}/retry`),
+  report: async (task?: string) => {
+    if (MOCK) return mockReport(task);
+    const token = getToken();
+    const r = await fetch(`/api/report${tq(task)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error(`report: ${r.status}`);
+    return r.text();
+  },
+  chatMentions: (kind: string, query: string, signal?: AbortSignal, cursor = "") =>
+    http<{ items: ChatMention[]; next_cursor?: string }>(
+      `/chat/mentions?${new URLSearchParams({ kind, q: query, cursor })}`,
+      { signal },
+    ),
+  chat: (message: string, task?: string, attachments?: ChatAttachment[], seg?: number) =>
+    post<{ reply: string; mode: string }>(`/chat${tq(task)}`, { message, attachments, seg }),
+  chatStatus: (taskId: string) => get<{ running: boolean }>(`/tasks/${taskId}/chat/status`),
+  // Method1 File upload:fall into conversation/Task working directory uploads/，return available agent Read relative path to。
+  chatUpload: async (scope: "task" | "session" | "staging", id: string, files: File[]) => {
+    if (MOCK)
+      return {
+        attachments: files.map((f) => ({
+          name: f.name,
+          path: `uploads/${f.name}`,
+          size: f.size,
+          abs: `/mock/${f.name}`,
+        })),
+      };
+    const fd = new FormData();
+    for (const f of files) fd.append("file", f);
+    const token = getToken();
+    const r = await fetch(`/api/chat/upload?scope=${scope}&id=${encodeURIComponent(id)}`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: fd,
+    });
+    if (!r.ok) throw new Error(`Upload failed:
+Example download content for ${r.status} ${await r.text()}`);
+    return r.json() as Promise<{ attachments: ChatAttachment[] }>;
+  },
+  stopChat: (taskId: string) => post<{ status: string }>(`/tasks/${taskId}/chat/stop`, {}),
+  gc: (ttl = 86400) => post<{ removed: number }>(`/gc?ttl=${ttl}`, {}),
+
+  // ---- LLM ----
+  getLLM: () =>
+    get<{
+      configured: boolean;
+      provider: string;
+      model: string;
+      base_url: string;
+      proxy?: string;
+      key_set: boolean;
+      rate_per_second?: number;
+      rate_per_minute?: number;
+      context_window_k?: number;
+      thinking_type?: string;
+      reasoning_effort?: string;
+    }>("/llm"),
+  setLLM: (
+    provider: string,
+    model: string,
+    base_url: string,
+    api_key: string,
+    rate_per_second = 0,
+    rate_per_minute = 0,
+    proxy = "",
+    context_window_k = 0,
+  ) => post("/llm", { provider, model, base_url, proxy, api_key, rate_per_second, rate_per_minute, context_window_k }),
+  testLLM: (
+    provider: string,
+    model: string,
+    base_url: string,
+    api_key: string,
+    proxy = "",
+    thinking_type = "",
+    reasoning_effort = "",
+    profile_id?: number,
+    streaming = true, // Use the real transceiver mode of this configuration to test, don’t let"Flow type can pass, non-flow type cannot"Leaked into session
+    session_header_key = "", // Not empty=The test request also carries the custom session header (the value is one-time session id）
+  ) =>
+    // reply = Model actual reply(Truncated);If the configuration backend does not reply a word, it will be directly judged as failed.
+    post<{ ok: boolean; error?: string; latency_ms?: number; model?: string; reply?: string }>("/llm/test", {
+      provider,
+      model,
+      base_url,
+      proxy,
+      api_key,
+      thinking_type,
+      reasoning_effort,
+      profile_id,
+      streaming,
+      session_header_key,
+    }),
+  llmProfiles: () => get<{ profiles: LLMProfile[] }>("/llm/profiles").then((r) => arr(r.profiles)),
+  saveLLMProfile: (p: {
+    id?: number; // omit/0 = create; set = update that profile
+    name: string;
+    format: string;
+    model: string;
+    base_url?: string;
+    proxy?: string;
+    api_key?: string; // blank on update keeps the existing key
+    rate_per_second?: number;
+    rate_per_minute?: number;
+    context_window_k?: number;
+    thinking_type?: string; // ""(Do not send)|"disabled"|"enabled"
+    reasoning_effort?: string; // ""(Do not send)|"low"|"medium"|"high"|"xhigh"|"max"
+    priority?: number; // Polling order, the larger the value, the earlier it is used.
+    pool_exclude?: boolean; // true=Not a failover target
+    streaming?: boolean; // true(Default)=Streaming | false=Non-streaming
+    max_tokens?: number; // Single reply output upper limit；0=Not sent, determined by server default value
+    max_tokens_field?: string; // ""=max_tokens(Default) | "max_completion_tokens"（Only openai Format）
+    session_header_key?: string; // Not empty=Each request brings this HTTP head, head value=current session session id；""=Do not send
+    retry?: LLMRetryOverride; // The retry coverage of this configuration; each item remains 0 = Follow the global retry strategy
+  }) => post<{ id: number }>("/llm/profiles", p),
+  deleteLLMProfile: (id: string) => del<{ deleted: number }>(`/llm/profiles/${id}`),
+  activateLLMProfile: (id: string) => post<{ ok: boolean }>("/llm/profiles/active", { id: Number(id) }),
+  // The actual order of the polling chain + Fuse status for each configuration。
+  llmPool: () => get<LLMPoolStatus>("/llm/pool"),
+  // Clear the circuit breaker so that the next call will retry the configuration immediately; do not pass id = Clear all。
+  resetLLMPool: (id?: string) => post<LLMPoolStatus>("/llm/pool/reset", { id: id ? Number(id) : 0 }),
+  // Global retry strategy (number of times for each of the five layers+interval). full 0 = Use built-in default for all。
+  llmRetryPolicy: () => get<LLMRetryPolicy>("/llm/retry-policy"),
+  saveLLMRetryPolicy: (p: LLMRetryPolicy) => post<LLMRetryPolicy>("/llm/retry-policy", p),
+  fetchLLMModels: (provider: string, base_url: string, api_key: string, proxy = "", profile_id?: number) =>
+    post<{ ok: boolean; error?: string; models?: string[] }>("/llm/models", {
+      provider,
+      base_url,
+      api_key,
+      proxy,
+      profile_id,
+    }),
+
+  // ---- agents ----
+  agents: () => get<{ agents: Agent[] }>("/agents").then((r) => arr(r.agents)),
+  getAgent: (key: string) => get<AgentDetail>(`/agents/${key}`),
+  createAgent: (input: AgentCreateInput | string, name?: string, description = "") =>
+    post<Agent>("/agents", typeof input === "string" ? { key: input, name, description } : input),
+  agentCreateOptions: () => get<AgentDetail>("/agents/create-options"),
+  previewNewAgentPrompt: (template: string) => post<{ rendered: string; error?: string }>("/agents/create-options/preview", { template }),
+  updateAgent: (key: string, name: string, description = "") =>
+    patch<{ ok: boolean }>(`/agents/${key}`, { name, description }),
+  deleteAgent: (key: string) => del<{ deleted: string }>(`/agents/${key}`),
+
+  // ---- conversations (chat page) ----
+  conversations: () => get<{ conversations: Conversation[] }>("/conversations?preview=1").then((r) => arr(r.conversations)),
+  createConversation: (agent_key: string, title = "", llm_profile_id?: number | null) =>
+    post<Conversation>("/conversations", { agent_key, title, llm_profile_id: llm_profile_id ?? null }),
+  updateConversation: (id: number, input: { title?: string; pinned?: boolean }) =>
+    patch<Conversation>(`/conversations/${id}`, input),
+  renameConversation: (id: number, title: string) => patch<Conversation>(`/conversations/${id}`, { title }),
+  pinConversation: (id: number, pinned: boolean) => patch<Conversation>(`/conversations/${id}`, { pinned }),
+  updateConversationProfile: (id: number, llm_profile_id: number | null) =>
+    patch<{ ok: boolean }>(`/conversations/${id}/profile`, { llm_profile_id }),
+  deleteConversation: (id: number) => del<{ deleted: number }>(`/conversations/${id}`),
+  deleteConversations: (ids: number[]) =>
+    post<{ items: { id: number; ok: boolean; error?: string }[] }>("/conversations/delete/batch", { ids }),
+  // Incremental tail: steps after `since` (id ASC) — live poll + post-send fetch.
+  conversationMessages: (id: number, since = 0) =>
+    get<{ items: Activity[]; cursor: number; running: boolean }>(`/conversations/${id}/messages?since=${since}`).then(
+      (r) => ({ items: arr(r.items), cursor: r.cursor ?? 0, running: !!r.running }),
+    ),
+  // Reverse pagination: the latest `limit` steps (before=0) or the page of older
+  // steps ending before id `before`. hasMore = still-older steps exist.
+  conversationHistory: (id: number, before = 0, limit = 200) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (before > 0) q.set("before", String(before));
+    return get<{ items: Activity[]; cursor: number; running: boolean; hasMore: boolean }>(
+      `/conversations/${id}/messages?${q.toString()}`,
+    ).then((r) => ({ items: arr(r.items), cursor: r.cursor ?? 0, running: !!r.running, hasMore: !!r.hasMore }));
+  },
+  conversationMsgDetail: (id: number, seq: number) =>
+    get<{ detail: string }>(`/conversations/${id}/messages/${seq}`).then((r) => r.detail ?? ""),
+  sendConversationMessage: (id: number, message: string, attachments?: ChatAttachment[]) =>
+    post<{ status: string }>(`/conversations/${id}/messages`, { message, attachments }),
+  stopConversation: (id: number) => post<{ status: string }>(`/conversations/${id}/stop`, {}),
+  saveAgentPrompt: (key: string, template: string, note = "") =>
+    put<{ version: number }>(`/agents/${key}/prompt`, { template, note }),
+  resetAgentPrompt: (key: string) => post<{ version: number }>(`/agents/${key}/prompt/reset`, {}),
+  // Closing prompt word(Timeout/Steps exhausted settlement Tips);prompt Empty string=Clear overwrite, use built-in default;
+  // max_turns If omitted, it will not move and pass 0=Use built-in default number of rounds
+  saveAgentWrapup: (key: string, prompt: string, maxTurns?: number) =>
+    put<{ ok: boolean }>(`/agents/${key}/wrapup`, { prompt, max_turns: maxTurns }),
+  resetAgentWrapup: (key: string) =>
+    post<{ ok: boolean; wrapup_default: string; wrapup_max_turns_default: number }>(`/agents/${key}/wrapup/reset`, {}),
+  // Task-level timeout ending word(Only worker/planner);prompt Empty=Clear, use built-in default
+  saveAgentTaskTimeoutWrapup: (key: string, prompt: string, maxTurns?: number) =>
+    put<{ ok: boolean }>(`/agents/${key}/wrapup/task-timeout`, { prompt, max_turns: maxTurns }),
+  resetAgentTaskTimeoutWrapup: (key: string) =>
+    post<{ ok: boolean; task_timeout_wrapup_default: string; task_timeout_wrapup_max_turns_default: number }>(
+      `/agents/${key}/wrapup/task-timeout/reset`,
+      {},
+    ),
+  // P3 triggers (Custom only agent)
+  agentTriggers: (key: string) =>
+    get<{ triggers: AgentTrigger[] }>(`/agents/${key}/triggers`).then((r) => arr(r.triggers)),
+  createTrigger: (key: string, t: Omit<AgentTrigger, "id" | "agent_key" | "last_fire">) =>
+    post<AgentTrigger>(`/agents/${key}/triggers`, t),
+  updateTrigger: (id: number, t: Omit<AgentTrigger, "id" | "agent_key" | "last_fire">) =>
+    patch<{ ok: boolean }>(`/triggers/${id}`, t),
+  deleteTrigger: (id: number) => del<{ deleted: number }>(`/triggers/${id}`),
+  saveAgentConfig: (
+    key: string,
+    patch: {
+      llm_profile_id?: number | null; // number=Binding；null=Unbind(Follow the mission/Global)；Default=Not moving
+      max_turns?: number;
+      run_seconds?: number;
+      web_search?: boolean;
+      interactive_shell?: boolean;
+      trigger_run_mode?: "serial" | "parallel";
+      trigger_merge_mode?: "by_task" | "all" | "none";
+      trigger_max_parallel?: number;
+    },
+  ) => put<{ ok: boolean }>(`/agents/${key}/config`, patch),
+  agentPromptVersions: (key: string) =>
+    get<{ versions: PromptVersion[] }>(`/agents/${key}/prompts`).then((r) => arr(r.versions)),
+  agentVariables: (key: string) =>
+    get<{ variables: PromptVar[] }>(`/agents/${key}/variables`).then((r) => arr(r.variables)),
+  previewAgentPrompt: (key: string, template: string, sample?: Record<string, string>) =>
+    post<{ rendered: string; error?: string }>(`/agents/${key}/prompt/preview`, { template, sample }),
+  getAgentVisibility: (key: string) => get<{ mcp: number[]; skill: string[] }>(`/agents/${key}/visibility`),
+  setAgentVisibility: (key: string, mcp: number[], skill: string[]) =>
+    put<{ ok: boolean }>(`/agents/${key}/visibility`, { mcp, skill }),
+
+  // ---- tools (Built-in tool directory) ----
+  tools: () => get<{ tools: Tool[] }>("/tools").then((r) => arr(r.tools)),
+  saveTool: (key: string, patch: Pick<Tool, "description" | "schema" | "agents" | "enabled">) =>
+    put<{ ok: boolean }>(`/tools/${key}`, patch),
+  resetTool: (key: string) => post<{ ok: boolean }>(`/tools/${key}/reset`, {}),
+  // custom tools (Custom tools)
+  createCustomTool: (
+    t: Pick<Tool, "key" | "description" | "schema" | "agents" | "enabled" | "kind" | "exec" | "deferred">,
+  ) => post<{ key: string }>("/tools/custom", t),
+  updateCustomTool: (
+    key: string,
+    t: Pick<Tool, "description" | "schema" | "agents" | "enabled" | "kind" | "exec" | "deferred">,
+  ) => put<{ ok: boolean }>(`/tools/custom/${key}`, t),
+  deleteCustomTool: (key: string) => del<{ deleted: string }>(`/tools/custom/${key}`),
+  testCustomTool: (body: { kind: string; exec: Record<string, unknown>; params: Record<string, unknown> }) =>
+    post<{ output: string; is_error: boolean }>("/tools/custom/test", body),
+  detectPython: () => post<{ python_interpreter: string }>("/settings/python/detect", {}),
+
+  // ---- mcp ----
+  mcpServers: () => get<{ servers: MCPServer[] }>("/mcp").then((r) => arr(r.servers)),
+  saveMcpServer: (m: Partial<MCPServer>) => post<{ id: number }>("/mcp", m),
+  deleteMcpServer: (id: number) => del<{ deleted: number }>(`/mcp/${id}`),
+  mcpTools: (id: number) => get<{ tools: MCPTool[] }>(`/mcp/${id}/tools`).then((r) => arr(r.tools)),
+  refreshMcpServer: (id: number) => post<{ tools: MCPTool[] }>(`/mcp/${id}/refresh`, {}).then((r) => arr(r.tools)),
+
+  // ---- Asset synchronization (ScopeSentry Data source) ----
+  ssStatus: () =>
+    get<{ exists: boolean; configured: boolean; enabled: boolean; reachable: boolean; url?: string; tools: string[] }>(
+      "/sync/scopesentry/status",
+    ),
+  ssDatasource: (body: { url?: string; api_key?: string }) =>
+    post<{ id: number; enabled: boolean }>("/sync/scopesentry/datasource", body),
+  ssProjects: (page = 1, size = 50, search = "") =>
+    get<{ projects: SSProject[]; tag: Record<string, number> }>(
+      `/sync/scopesentry/projects?page=${page}&size=${size}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    ).then((r) => ({ projects: arr(r.projects), tag: r.tag ?? {} })),
+  ssTasks: (page = 1, size = 50, search = "") =>
+    get<{ tasks: SSTask[] }>(
+      `/sync/scopesentry/tasks?page=${page}&size=${size}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    ).then((r) => arr(r.tasks)),
+  ssSync: (body: {
+    dimension: "project" | "task";
+    targets: string[];
+    asset_types: string[];
+    create_company?: boolean;
+    page_size?: number;
+  }) =>
+    post<{
+      synced: Record<string, number>;
+      companies: string[] | null;
+      warnings: string[] | null;
+      errors: string[] | null;
+    }>("/sync/scopesentry/sync", body),
+
+  // ---- skills (File system) ----
+  skills: () => get<{ skills: SkillItem[] }>("/skills").then((r) => arr(r.skills)),
+  createSkill: (s: {
+    name: string;
+    description: string;
+    license?: string;
+    compatibility?: string;
+    mcps?: string[];
+    instructions?: string;
+  }) => post<{ name: string }>("/skills", s),
+  // uploadSkill installs a skill from a .zip (multipart). Surfaces the backend
+  // error text (e.g. already exists / Missing SKILL.md) so the UI can show a precise message.
+  uploadSkill: async (file: File, overwrite = false): Promise<{ name: string; files: number }> => {
+    if (MOCK) return { name: file.name.replace(/\.zip$/i, ""), files: 1 };
+    const fd = new FormData();
+    fd.append("file", file);
+    const token = getToken();
+    const r = await fetch(`/api/skills/upload${overwrite ? "?overwrite=true" : ""}`, {
+      method: "POST",
+      body: fd,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body?.error || `Upload failed (${r.status})`);
+    return body;
+  },
+  deleteSkill: (name: string) => del<{ deleted: string }>(`/skills/${name}`),
+  updateSkillMeta: (
+    name: string,
+    meta: { mcps?: string[]; description?: string; license?: string; compatibility?: string },
+  ) => put<{ ok: boolean }>(`/skills/${name}/meta`, meta),
+  createSkillDir: (skill: string, path: string) => post<{ dir: string }>(`/skills/${skill}/dirs`, { path }),
+  skillFiles: (name: string) => get<{ files: string[] }>(`/skills/${name}/files`).then((r) => r.files),
+  readSkillFile: (name: string, file: string) =>
+    get<{ content: string; file: string }>(`/skills/${name}/files/${file}`).then((r) => r.content),
+  writeSkillFile: (name: string, file: string, content: string) =>
+    put<{ ok: boolean }>(`/skills/${name}/files/${file}`, { content }),
+  deleteSkillPath: (skill: string, path: string) => del<{ deleted: string }>(`/skills/${skill}/files/${path}`),
+  skillUsage: (name: string, limit = 50) =>
+    get<{ calls: SkillCall[] }>(`/skills/${name}/usage?limit=${limit}`).then((r) => arr(r.calls)),
+  missingSkills: (limit = 20) =>
+    get<{ missing: MissingSkill[] }>(`/skills/missing?limit=${limit}`).then((r) => arr(r.missing)),
+
+  // ---- visibility (MCP resource side) ---- (agent ids are strings per spec)
+  resourceVisibility: (kind: string, id: number) =>
+    get<{ agents: string[] }>(`/visibility/${kind}/${id}`).then((r) => arr(r.agents)),
+  toggleVisibility: (agentId: string, kind: string, resourceId: number, visible: boolean) =>
+    post<{ ok: boolean }>("/visibility/toggle", { agent_id: agentId, kind, resource_id: resourceId, visible }),
+
+  // ---- visibility (Skill，By name) ----
+  skillVisibility: (name: string) => get<{ agents: string[] }>(`/visibility/skill/${name}`).then((r) => arr(r.agents)),
+  toggleSkillVisibility: (agentId: string, skillName: string, visible: boolean) =>
+    post<{ ok: boolean }>("/visibility/skill/toggle", { agent_id: agentId, skill_name: skillName, visible }),
+
+  // ---- intercept rules ----
+  interceptRules: () => get<{ rules: InterceptRule[] }>("/intercept/rules").then((r) => arr(r.rules)),
+  createInterceptRule: (rule: Omit<InterceptRule, "id" | "created_at" | "updated_at">) =>
+    post<InterceptRule>("/intercept/rules", rule),
+  updateInterceptRule: (id: number, rule: Omit<InterceptRule, "id" | "created_at" | "updated_at">) =>
+    put<InterceptRule>(`/intercept/rules/${id}`, rule),
+  deleteInterceptRule: (id: number) => del<{ deleted: number }>(`/intercept/rules/${id}`),
+  toggleInterceptRule: (id: number, enabled: boolean) =>
+    post<{ ok: boolean; enabled: boolean }>(`/intercept/rules/${id}/toggle`, { enabled }),
+
+  // ---- asset intercept rules（Asset Interception: Global Blacklist） ----
+  assetInterceptRules: () => get<{ rules: AssetInterceptRule[] }>("/asset-intercept/rules").then((r) => arr(r.rules)),
+  createAssetInterceptRule: (rule: Pick<AssetInterceptRule, "enabled" | "kind" | "pattern" | "note">) =>
+    post<AssetInterceptRule>("/asset-intercept/rules", rule),
+  updateAssetInterceptRule: (id: number, rule: Pick<AssetInterceptRule, "enabled" | "kind" | "pattern" | "note">) =>
+    put<AssetInterceptRule>(`/asset-intercept/rules/${id}`, rule),
+  deleteAssetInterceptRule: (id: number) => del<{ deleted: number }>(`/asset-intercept/rules/${id}`),
+  toggleAssetInterceptRule: (id: number, enabled: boolean) =>
+    post<{ ok: boolean; enabled: boolean }>(`/asset-intercept/rules/${id}/toggle`, { enabled }),
+
+  // ---- intercept pending (ask) ----
+  interceptPending: () => get<{ pending: InterceptPending[] }>("/intercept/pending").then((r) => arr(r.pending)),
+  interceptGetOne: (id: number) => get<InterceptPending>(`/intercept/pending/${id}`),
+  interceptDecide: (id: number, decision: "allowed" | "denied") =>
+    post<{ ok: boolean }>(`/intercept/pending/${id}/decide`, { decision }),
+  interceptExecution: (id: number, conversationId?: number) =>
+    get<import("@/lib/types").InterceptExecution>(
+      `/intercept/history/${id}/execution${conversationId ? `?conversation=${conversationId}` : ""}`,
+    ),
+  interceptDetail: (id: number) => get<InterceptDetail>(`/intercept/history/${id}`),
+  interceptHistory: () => get<{ items: InterceptApprovalRow[] }>("/intercept/history").then((r) => arr(r.items)),
+  interceptHistoryPage: (page = 1, size = 20, filter: InterceptApprovalFilter = {}) =>
+    get<{ items: InterceptApprovalRow[]; total?: number }>(
+      `/intercept/history?${interceptPageQuery(page, size, filter)}`,
+    ).then((r) => ({
+      items: arr(r.items),
+      total: r.total ?? r.items?.length ?? 0,
+    })),
+  interceptTask: (taskId: string) =>
+    get<{ items: InterceptApprovalRow[] }>(`/intercept/task/${taskId}`).then((r) => arr(r.items)),
+  interceptTaskPage: (taskId: string, page = 1, size = 20, filter: InterceptApprovalFilter = {}) =>
+    get<{ items: InterceptApprovalRow[]; total?: number }>(
+      `/intercept/task/${encodeURIComponent(taskId)}?${interceptPageQuery(page, size, filter)}`,
+    ).then((r) => ({
+      items: arr(r.items),
+      total: r.total ?? r.items?.length ?? 0,
+    })),
+
+  // ---- intercept tool-config (Global tool interception scope) ----
+  interceptGetToolConfig: async (): Promise<{ enabled_tools: string[] }> => {
+    if (MOCK) return { enabled_tools: ["bash"] };
+    const token = getToken();
+    const r = await fetch("/api/intercept/tool-config", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  interceptSetToolConfig: async (enabledTools: string[]): Promise<void> => {
+    if (MOCK) return;
+    const token = getToken();
+    const r = await fetch("/api/intercept/tool-config", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ enabled_tools: enabledTools }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+  },
+
+  // ---- intercept LLM judge (Model approval,Global configuration) ----
+  interceptGetJudgeConfig: () => get<JudgeConfig>("/intercept/judge"),
+  interceptSetJudgeConfig: (cfg: JudgeConfig) => put<{ ok: boolean }>("/intercept/judge", cfg),
+  interceptJudgeUsage: (days = 30) => get<JudgeUsage>(`/intercept/judge/usage?days=${days}`),
+
+  // ---- commands (tool execution history, any tool) ----
+  commands: (params?: { task?: string; q?: string; page?: number; size?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.task) sp.set("task_id", params.task);
+    if (params?.q) sp.set("q", params.q);
+    sp.set("page", String(params?.page ?? 0));
+    sp.set("size", String(params?.size ?? 50));
+    return get<{ commands: CommandRecord[]; total: number }>(`/commands?${sp}`);
+  },
+  // The number of times each tool is called; follow the list task/q Filtering, counting the entire result set instead of the current page。
+  commandStats: (params?: { task?: string; q?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.task) sp.set("task_id", params.task);
+    if (params?.q) sp.set("q", params.q);
+    return get<{ stats: ToolStat[] }>(`/commands/stats?${sp}`);
+  },
+
+  // ---- LLM records ----
+  llmRecords: (params?: { model?: string; session?: string; task?: string; page?: number; size?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.model) sp.set("model", params.model);
+    if (params?.session) sp.set("session", params.session);
+    if (params?.task) sp.set("task", params.task);
+    if (params?.page !== undefined) sp.set("page", String(params.page));
+    sp.set("size", String(params?.size ?? 50));
+    return get<{ records: LLMRecordItem[]; total: number }>(`/llm/records?${sp}`);
+  },
+  llmRecordDetail: (id: number) => get<LLMRecordDetail>(`/llm/records/${id}`),
+  llmTasks: () => get<{ tasks: LLMTask[] }>(`/llm/records/tasks`),
+  llmRecordsDeleteTask: (task: string) => del<{ deleted: number }>(`/llm/records?task=${encodeURIComponent(task)}`),
+  // Aggregate the results of this task by model token Dosage (from normally open llm_usage Measurement ledger, accurate call after call，
+  // per-agent Binding / Polling / Interrupt consumption is covered）。
+  tokensByModel: (task: string) =>
+    get<{ models: ModelTokenStat[] }>(`/llm/records/by-model?task=${encodeURIComponent(task)}`),
+
+  // ---- One-click update ----
+  // Check the backend: the download is done by the backend, and the browser can connect GitHub It is very common that the server cannot be connected
+  // （The server is on the intranet and the proxy is only configured on the browser), then the update will inevitably fail.。
+  // Backend pair The query results for GitHub are 30 Minute cache (unauthenticated GitHub API Yes 60 times/hours/IP，
+  // The top bar will be checked every time the entire page is loaded. Without caching, the quota will be consumed quickly.）。force=true Forced return to origin，
+  // Reserved for use when the user explicitly clicks ”Check for Updates”。
+  checkUpdate: (force = false) => get<UpdateCheck>(`/update/check${force ? "?force=1" : ""}`),
+  // 202 Returns. The actual download is running in the background and the progress is slow. /api/update/stream。
+  applyUpdate: () => post<{ ok: boolean; target: string }>(`/update/apply`),
+  rollbackUpdate: () => post<{ ok: boolean }>(`/update/rollback`),
+};

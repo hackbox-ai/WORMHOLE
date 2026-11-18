@@ -1,0 +1,113 @@
+[
+  {
+    "key": "get_finding_traffic",
+    "description": "Read the real traffic evidence that the vulnerability has been bound to, without relying on the capture switch. finding_id uses the individual vulnerability record ID returned by report_finding JSON (not the discovery node ID of the first row). Do not pass binding_id to get the list and version; an empty list is normal. For non-HTTP vulnerabilities such as TCP or when they are not collected, reports can still be written based on text/command evidence without forcing binding. When there is binding, read the text in sections according to binding_id, side(request/response), and offset. When writing the report, the read version is passed to update_finding_report as evidence_version, and the latter's finding_id still uses the exploration node ID.",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "description": "Independent vulnerability record ID"
+        },
+        "binding_id": {
+          "type": "string",
+          "description": "Binding ID in the list, if omitted, the list will be returned"
+        },
+        "side": {
+          "type": "string",
+          "description": "request or response, default response"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "length": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "finding_id"
+      ]
+    },
+    "agents": [
+      "auto",
+      "reporter",
+      "worker",
+      "planner",
+      "mainagent",
+      "pentest"
+    ]
+  },
+  {
+    "key": "bind_finding_traffic",
+    "description": "Patch verified real HTTP traffic for registered vulnerabilities. finding_id uses an independent vulnerability record ID; do not pass the exploration node ID. All references in the same batch succeed or all fail. Repeated references will not cover existing instructions. Patching will mark existing reports for update; do not re-detect or re-create vulnerabilities for patching.",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "description": "Individual vulnerability record ID, read from the finding_id field of list_task_findings/get_task_node_detail"
+        },
+        "traffic_refs": {
+          "type": "array",
+          "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "traffic_id": {
+                "type": "string",
+                "description": "Real Traffic ID"
+              },
+              "role": {
+                "type": "string",
+                "description": "baseline / proof / verification / supporting"
+              },
+              "note": {
+                "type": "string",
+                "description": "What conclusion does this flow support?"
+              }
+            },
+            "required": [
+              "traffic_id"
+            ]
+          }
+        }
+      },
+      "required": [
+        "finding_id",
+        "traffic_refs"
+      ]
+    },
+    "agents": [
+      "reporter"
+    ]
+  },
+  {
+    "key": "update_finding_report",
+    "description": "Write/update the [detailed report] (Full text in Markdown, covering the entire paragraph with the old content) for the registered vulnerability. finding_id passes the id returned by report_finding (the number in \"finding recorded: <id>\"). The report recommendations include: vulnerability overview, impact and harm, reproduction steps, evidence/PoC, and repair suggestions.",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "finding_id": {
+          "type": "integer",
+          "description": "Target vulnerability id (id returned by report_finding)"
+        },
+        "report": {
+          "type": "string",
+          "description": "Full text of detailed report, Markdown format"
+        },
+        "evidence_version": {
+          "type": "integer",
+          "description": "Evidence version returned by get_finding_traffic; used to prevent reports from overwriting new evidence changes"
+        }
+      },
+      "required": [
+        "finding_id",
+        "report"
+      ]
+    },
+    "agents": [
+      "auto",
+      "reporter"
+    ]
+  }
+]

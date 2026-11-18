@@ -1,0 +1,716 @@
+[
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "List all tasks (id/description/goal/status/running time/parent task/LLM configuration), and orchestrate the agent to use it to grasp the overall situation, see which tasks are stuck for too long, and which LLM to use for each. Running time: running = created → now, final state = created → last activity (seconds). llm_profile: Configuration name used by task planner/worker, (activation configuration) = follow global activation.",
+    "key": "list_tasks",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "List available LLM profiles (profiles): id, name, model, format, whether it is the currently active profile. Use the id to specify the subtask-specific LLM for the llm_profile_id parameter of spawn_task (such as a cheap model for reconnaissance, a strong model for exploitation). Does not include API Key.",
+    "key": "list_llm_profiles",
+    "schema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Create a new subtask and start the exploration engine, returning task_id. Used to assign one thing (such as a question/a goal) into an independent task. parent_ref Optional: Fill in the parent task id of the current orchestration association to make a parent-child association.",
+    "key": "spawn_task",
+    "schema": {
+      "properties": {
+        "description": {
+          "description": "Task description (short title)",
+          "type": "string"
+        },
+        "goal": {
+          "description": "Mission goal (what to achieve)",
+          "type": "string"
+        },
+        "llm_profile_id": {
+          "description": "Optional: Specify the LLM configuration id used by this subtask planner/worker (see list_llm_profiles); leave it blank to inherit the parent task and then roll back to the global activation configuration",
+          "type": "integer"
+        },
+        "parent_ref": {
+          "description": "Optional: Parent task id (for parent-child association)",
+          "type": "string"
+        },
+        "plan_heartbeat_seconds": {
+          "description": "Optional: planner heartbeat trigger interval (seconds). This value is reached from the end of the last round of planning/the start of the task and there is no trigger during the period → trigger a round of planning (deadlock + wake up to supervise the flying worker). Leave blank or 0 = default 600(10min);",
+          "type": "integer"
+        },
+        "seed_first_intent": {
+          "description": "Optional: It can be turned on for simple tasks. When creating, a seed intention (content = description + target) is directly sent to the worker to start running the test without waiting for the first round of planner; the default is false (follow the standard plan first and then execute).",
+          "type": "boolean"
+        },
+        "source_task_ids": {
+          "description": "Optional: Read-only list of inherited source task ids (up to 8). Subtasks can have read-only references to the assets/conclusions these tasks have proven as starting points; this is content inheritance unlike parent_ref's pure parent-child pointer.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "description": "Optional: Task-level timeout (seconds). After reaching the point, trigger the graceful ending and enter the timeout final state; leave it blank or 0 = no time limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "description",
+        "goal"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Pause the specified task (stop its planner/worker loop).",
+    "key": "pause_task",
+    "schema": {
+      "properties": {
+        "task_id": {
+          "description": "Task id to be paused",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Read the exploration graph overview of the specified task (same as graph_overview: asset count/frontier/discovery/coverage, etc.), specify the task with task_id.",
+    "key": "get_task_graph",
+    "schema": {
+      "properties": {
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Read the confirmation vulnerability of the specified task (including flag/PoC; each with id/task_id/intent_id/vulnclass/severity/summary/status), specify the task with task_id.",
+    "key": "list_task_findings",
+    "schema": {
+      "properties": {
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Inject strategic hints into the specified task (the planner of the task will read it when generating the intention in the next round).\n★Batch priority: Put multiple hints into the hints array and submit them at once (return the ids array, in the same length and order as hints, and the failed item id=0); for a single hint, omit hints and send it directly to the top-level text.",
+    "key": "add_task_hint",
+    "schema": {
+      "properties": {
+        "asset_ids": {
+          "description": "Anchored asset id (optional, 0/1/multiple; asset id within this task)",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "hints": {
+          "description": "[Use this first] Prompt array, each element field is the same as the top level (text/asset_ids/traffic_refs).",
+          "items": {
+            "properties": {
+              "asset_ids": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "text": {
+                "description": "Prompt content",
+                "type": "string"
+              },
+              "traffic_refs": {
+                "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+                "items": {
+                  "properties": {
+                    "note": {
+                      "description": "What conclusion does this flow support?",
+                      "type": "string"
+                    },
+                    "role": {
+                      "description": "baseline / proof / verification / supporting",
+                      "type": "string"
+                    },
+                    "traffic_id": {
+                      "description": "Real Traffic ID",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "traffic_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        },
+        "text": {
+          "description": "[Single] Prompt content",
+          "type": "string"
+        },
+        "traffic_refs": {
+          "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+          "items": {
+            "properties": {
+              "note": {
+                "description": "What conclusion does this flow support?",
+                "type": "string"
+              },
+              "role": {
+                "description": "baseline / proof / verification / supporting",
+                "type": "string"
+              },
+              "traffic_id": {
+                "description": "Real Traffic ID",
+                "type": "string"
+              }
+            },
+            "required": [
+              "traffic_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "View the execution process of a certain work (intention) in the specified task: get_task_worker_trace(task_id, intent_id) to view the step summary; then add step_ids=[...] to get the complete content of those steps (up to 5 at a time, only the first 5 will be returned in multi-pass).",
+    "key": "get_task_worker_trace",
+    "schema": {
+      "properties": {
+        "intent_id": {
+          "description": "Intent id (work in this task)",
+          "type": "integer"
+        },
+        "step_ids": {
+          "description": "Optional: Step ids to get the complete content (up to 5 at a time, only the first 5 are returned for multi-pass, and the rest are listed in omitted_step_ids)",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "intent_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Lists which work (intention) has been run in the specified task + the number of steps respectively, used to find which work is worth looking at (reuse get_task_worker_trace).",
+    "key": "list_task_worker_traces",
+    "schema": {
+      "properties": {
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Search the execution process of all work in the specified task by keyword (return hit step summary + intent_id).",
+    "key": "search_task_worker_traces",
+    "schema": {
+      "properties": {
+        "q": {
+          "description": "Search keyword",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "q"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Read the complete content of an exploration graph node in the specified task (discovery/facts/intentions/goals: summary + details/evidence/PoC). id is the exploration node id (such as the id returned by report_finding, or the id in list_task_findings). Use it to obtain complete evidence of the vulnerability before writing a vulnerability report.",
+    "key": "get_task_node_detail",
+    "schema": {
+      "properties": {
+        "id": {
+          "description": "Exploration graph node id (non-asset id)",
+          "type": "integer"
+        },
+        "task_id": {
+          "description": "Task id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Write/update the [detailed report] (Full text in Markdown, covering the entire paragraph with the old content) for the registered vulnerability. finding_id passes the id returned by report_finding (the number in \"finding recorded: <id>\"). The report recommendations include: vulnerability overview, impact and harm, reproduction steps, evidence/PoC, and repair suggestions.",
+    "key": "update_finding_report",
+    "schema": {
+      "properties": {
+        "evidence_version": {
+          "description": "Evidence version returned by get_finding_traffic; used to prevent reports from overwriting new evidence changes",
+          "type": "integer"
+        },
+        "finding_id": {
+          "description": "Target vulnerability id (id returned by report_finding)",
+          "type": "integer"
+        },
+        "report": {
+          "description": "Full text of detailed report, Markdown format",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "report"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Read the real traffic evidence that the vulnerability has been bound to, without relying on the capture switch. finding_id uses the individual vulnerability record ID returned by report_finding JSON (not the discovery node ID of the first row). Do not pass binding_id to get the list and version; an empty list is normal. For non-HTTP vulnerabilities such as TCP or when they are not collected, reports can still be written based on text/command evidence without forcing binding. When there is binding, read the text in sections according to binding_id, side(request/response), and offset. When writing the report, the read version is passed to update_finding_report as evidence_version, and the latter's finding_id still uses the exploration node ID.",
+    "key": "get_finding_traffic",
+    "schema": {
+      "properties": {
+        "binding_id": {
+          "description": "Binding ID in the list, if omitted, the list will be returned",
+          "type": "string"
+        },
+        "finding_id": {
+          "description": "Independent vulnerability record ID",
+          "type": "string"
+        },
+        "length": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "side": {
+          "description": "request or response, default response",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Patch verified real HTTP traffic for registered vulnerabilities. finding_id uses an independent vulnerability record ID; do not pass the exploration node ID. All references in the same batch succeed or all fail. Repeated references will not cover existing instructions. Patching will mark existing reports for update; do not re-detect or re-create vulnerabilities for patching.",
+    "key": "bind_finding_traffic",
+    "schema": {
+      "properties": {
+        "finding_id": {
+          "description": "Individual vulnerability record ID, read from the finding_id field of list_task_findings/get_task_node_detail",
+          "type": "string"
+        },
+        "traffic_refs": {
+          "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+          "items": {
+            "properties": {
+              "note": {
+                "description": "What conclusion does this flow support?",
+                "type": "string"
+              },
+              "role": {
+                "description": "baseline / proof / verification / supporting",
+                "type": "string"
+              },
+              "traffic_id": {
+                "description": "Real Traffic ID",
+                "type": "string"
+              }
+            },
+            "required": [
+              "traffic_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "finding_id",
+        "traffic_refs"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Create a new skill (write SKILL.md, agentskills.io specification). name lowercase letters/numbers/hyphens.",
+    "key": "create_skill",
+    "schema": {
+      "properties": {
+        "description": {
+          "description": "Skill description (required, describe what it does/when to use it)",
+          "type": "string"
+        },
+        "instructions": {
+          "description": "Markdown text description (optional)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Skill name (begins with a lowercase letter, letters/numbers/hyphens)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Write/overwrite a file within a skill (default SKILL.md). Used to modify skill content or add scripts/references.",
+    "key": "update_skill_file",
+    "schema": {
+      "properties": {
+        "content": {
+          "description": "Complete file content",
+          "type": "string"
+        },
+        "file": {
+          "description": "Relative path (optional, default SKILL.md, such as scripts/run.py)",
+          "type": "string"
+        },
+        "name": {
+          "description": "skill name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "content"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "[Important] When installing some tools that are not available on the platform, call this tool to put the installed tools into the platform so that the platform can call it! Create a custom tool (shell/command/script/http). shell=bash environment declaration, only key+description+agents, no exec/schema required.",
+    "key": "create_custom_tool",
+    "schema": {
+      "properties": {
+        "agents": {
+          "description": "Binding agent key (optional)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "deferred": {
+          "description": "Whether to delay (the shell type is invalid; only uncommon tools of command/script/http are enabled)",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Description sent to model",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether to enable (default true)",
+          "type": "boolean"
+        },
+        "exec": {
+          "description": "Execution specifications (not required for shell type): command→{command}; script→{code}; http→{method,url,headers,body,proxy,use_recording_proxy}",
+          "type": "object"
+        },
+        "key": {
+          "description": "Tool key (begins with lowercase letter, letter/number/underline)",
+          "type": "string"
+        },
+        "kind": {
+          "description": "shell | command | script (Python only) | http. shell=bash environment statement (only informs the model that the tool can be called directly in bash without exec/schema); the other three require exec",
+          "type": "string"
+        },
+        "schema": {
+          "description": "Parameter JSON-Schema (shell/command/script can be left blank; http is required and must contain properties)",
+          "type": "object"
+        }
+      },
+      "required": [
+        "key",
+        "kind"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Modify an existing custom tool (press key).",
+    "key": "update_custom_tool",
+    "schema": {
+      "properties": {
+        "agents": {
+          "description": "Binding agent key (optional)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "deferred": {
+          "description": "Whether to delay (the shell type is invalid; only uncommon tools of command/script/http are enabled)",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Description sent to model",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether to enable (default true)",
+          "type": "boolean"
+        },
+        "exec": {
+          "description": "Execution specifications (not required for shell type): command→{command}; script→{code}; http→{method,url,headers,body,proxy,use_recording_proxy}",
+          "type": "object"
+        },
+        "key": {
+          "description": "Custom tool key to be modified",
+          "type": "string"
+        },
+        "kind": {
+          "description": "shell | command | script (Python only) | http. shell=bash environment statement (only informs the model that the tool can be called directly in bash without exec/schema); the other three require exec",
+          "type": "string"
+        },
+        "schema": {
+          "description": "Parameter JSON-Schema (shell/command/script can be left blank; http is required and must contain properties)",
+          "type": "object"
+        }
+      },
+      "required": [
+        "key",
+        "kind"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Create an MCP server (stdio/http/sse). After creation, its tools need to be authorized according to agent visibility.",
+    "key": "create_mcp",
+    "schema": {
+      "properties": {
+        "args": {
+          "description": "Command parameter array\nStart command for",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "stdio startup command (such as npx)",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether to enable (default true)",
+          "type": "boolean"
+        },
+        "env": {
+          "description": "Environment variable {KEY:VALUE}",
+          "type": "object"
+        },
+        "insecure": {
+          "description": "http: Skip TLS certificate verification (set to true when self-signing the certificate, default to false)",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "MCP server name",
+          "type": "string"
+        },
+        "transport": {
+          "description": "stdio | http / sse",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL for http/sse",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "transport"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Modify an existing MCP server (by id).",
+    "key": "update_mcp",
+    "schema": {
+      "properties": {
+        "args": {
+          "description": "Command parameter array\nStart command for",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "stdio startup command (such as npx)",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether to enable (default true)",
+          "type": "boolean"
+        },
+        "env": {
+          "description": "Environment variable {KEY:VALUE}",
+          "type": "object"
+        },
+        "id": {
+          "description": "MCP server id to modify",
+          "type": "integer"
+        },
+        "insecure": {
+          "description": "http: Skip TLS certificate verification (set to true when self-signing the certificate, default to false)",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "MCP server name",
+          "type": "string"
+        },
+        "transport": {
+          "description": "stdio | http / sse",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL for http/sse",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "transport"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "agents": [
+      "auto"
+    ],
+    "description": "Accurately delete assets by host: delete the domain name/subdomain name of the host, as well as the services and endpoints under it.\nhost matches exactly (lowercase, remove spaces), not fuzzy/wildcarding.\nPassing the root domain name (such as example.com) will also delete its subdomain name and its services/interfaces; passing the subdomain name (such as a.example.com) or IP will only delete the host itself and its services/interfaces.\n⚠️ Hard deletion, affects the global asset library (shared across tasks), and cannot be undone.",
+    "key": "delete_assets_by_host",
+    "schema": {
+      "properties": {
+        "host": {
+          "description": "Host to be deleted: domain name/subdomain name/IP. An exact match like example.com or a.example.com or 1.2.3.4",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "type": "object"
+    }
+  }
+]

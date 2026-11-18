@@ -1,0 +1,11 @@
+import {fingerprintEvent} from './lifecycle.ts';
+import {registerTool,type ToolContext} from '../tools/gate.ts';
+import type {FingerprintService} from './service.ts';
+export const FINGERPRINT_TOOLS=['get_asset_fingerprints','identify_asset'];
+const agents=['planner','worker','pentest','mainagent'];
+const definitions=[
+ {key:'get_asset_fingerprints',description:"Read the fingerprint results and rule basis of the current task. asset_id / url is optional; Worker defaults to filtering by current intent; material_id can read the exact response evidence. The results do not represent vulnerabilities.",schema:{type:'object',properties:{asset_id:{type:'integer',minimum:1},url:{type:'string'},material_id:{type:'string'}}}},
+ {key:'identify_asset',description:"Reuse the current task's collected response to identify the specified web asset, and do not send the request. When there is no material, first use http_request to obtain the entry response.",schema:{type:'object',properties:{asset_id:{type:'integer',minimum:1}},required:['asset_id']}},
+];
+export async function seedFingerprintTools(service:FingerprintService){for(const d of definitions)await service.pool.query("INSERT INTO tools(key,system,description,schema,agents,kind) VALUES($1,TRUE,$2,$3::jsonb,$4::jsonb,'builtin') ON CONFLICT(key) DO UPDATE SET schema=EXCLUDED.schema,description=EXCLUDED.description",[d.key,d.description,JSON.stringify(d.schema),JSON.stringify(agents)]);}
+export function registerFingerprintTools(service:FingerprintService){for(const d of definitions)registerTool({...d,params:{},required:[],execute:async(p,ctx:ToolContext)=>{if(!ctx.taskId)throw new Error("Fingerprint tool requires current task context");if(d.key==='identify_asset')return service.identify(ctx.taskId,Number(p.asset_id));const result=p.material_id?await service.evidence(ctx.taskId,String(p.material_id)):await service.read(ctx.taskId,p.asset_id?Number(p.asset_id):undefined,p.url?{urls:[new URL(String(p.url)).href]}:ctx.intentId&&!p.asset_id?await service.focus(ctx.taskId,ctx.intentId):undefined);await fingerprintEvent(service.pool,ctx.taskId,'fingerprint_evidence_read',{intent_id:ctx.intentId,tool:d.key,asset_id:p.asset_id,url:p.url,material_id:p.material_id});return result;}});}

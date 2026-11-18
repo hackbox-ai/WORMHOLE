@@ -1,0 +1,6 @@
+# Adds the optional matching engine; import rule data separately.
+services:
+  wormhole:
+    image: wormhole-fingerprints:local
+    build:
+      target: fingerprints

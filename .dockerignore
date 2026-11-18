@@ -1,16 +1,17 @@
-# 运行数据 — 不该进镜像，排除以加速 build context 上传
-solver_runs/
-solver-prompts/
-
-# Python 缓存
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# 版本控制 / 编辑器 / 文档
-.git/
-.gitignore
-.vscode/
-.idea/
-docs/
+.git
+**/node_modules
+web/.next
+web/out
+**/*.log
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+!.env.example
+**/config.local.json
+**/config.test.json
+**/data
+**/jwt.key
+file/implementation
+SOURCE_SNAPSHOT.json
+artifacts

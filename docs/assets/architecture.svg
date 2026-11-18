@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320" role="img" aria-labelledby="title desc">
+  <title id="title">WORMHOLE system architecture</title>
+  <desc id="desc">Research interface, task orchestration, and controlled execution share a state and evidence layer. These are logical responsibilities, not separate deployment units.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b8077"/>
+    </marker>
+  </defs>
+  <rect width="900" height="320" rx="12" fill="#ffffff"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" text-anchor="middle">
+    <g id="research">
+      <rect x="20" y="20" width="260" height="140" rx="10" fill="#f4f8f5" stroke="#cbdcd1"/>
+      <text x="150" y="54" fill="#173e2b" font-size="20" font-weight="600">Research Interface</text>
+      <text fill="#52665b" font-size="15">
+        <tspan x="150" y="84">Task goals &amp; scope</tspan>
+        <tspan x="150" y="108">Operator feedback</tspan>
+        <tspan x="150" y="132">Progress review</tspan>
+      </text>
+    </g>
+    <g id="orchestration">
+      <rect x="320" y="20" width="260" height="140" rx="10" fill="#f4f8f5" stroke="#cbdcd1"/>
+      <text x="450" y="54" fill="#173e2b" font-size="20" font-weight="600">Task Orchestration</text>
+      <text fill="#52665b" font-size="15">
+        <tspan x="450" y="84">Business modeling</tspan>
+        <tspan x="450" y="108">Planning &amp; scheduling</tspan>
+        <tspan x="450" y="132">Task lifecycle</tspan>
+      </text>
+    </g>
+    <g id="execution">
+      <rect x="620" y="20" width="260" height="140" rx="10" fill="#f4f8f5" stroke="#cbdcd1"/>
+      <text x="750" y="54" fill="#173e2b" font-size="20" font-weight="600">Controlled Execution</text>
+      <text fill="#52665b" font-size="15">
+        <tspan x="750" y="84">Tool gating</tspan>
+        <tspan x="750" y="108">Browser &amp; HTTP</tspan>
+        <tspan x="750" y="132">Shell commands</tspan>
+      </text>
+    </g>
+    <g fill="none" stroke="#6b8077" stroke-width="1.5" marker-end="url(#arrow)">
+      <path d="M 284 90 H 315"/>
+      <path d="M 584 90 H 615"/>
+      <path d="M 150 166 V 207"/>
+      <path d="M 450 166 V 207"/>
+      <path d="M 750 166 V 207"/>
+    </g>
+    <g id="shared">
+      <rect x="20" y="214" width="860" height="94" rx="10" fill="#f6f7f9" stroke="#d5dbe2"/>
+      <text x="450" y="245" fill="#263746" font-size="19" font-weight="600">Shared State &amp; Evidence</text>
+      <text fill="#566473" font-size="15">
+        <tspan x="450" y="270">Exploration graph · Captured traffic · Workspace files</tspan>
+        <tspan x="450" y="292">Persistent events &amp; usage · Report jobs &amp; versions</tspan>
+      </text>
+    </g>
+  </g>
+</svg>

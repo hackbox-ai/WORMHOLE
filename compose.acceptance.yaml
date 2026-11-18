@@ -1,0 +1,36 @@
+name: wormhole-acceptance
+services:
+  tests:
+    image: wormhole:test
+    build:
+      context: .
+      target: test
+    entrypoint: ["node", "scripts/acceptance.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      WORMHOLE_ACCEPT_ADMIN_DSN: postgresql://wormhole:isolated-test-only@postgres:5432/wormhole_accept_admin
+      WORMHOLE_NETWORK_INTEGRATION: "1"
+      WORMHOLE_NETWORK_RECOVERY: "1"
+      WORMHOLE_LINUX_BUNDLE_TEST: "1"
+    volumes:
+      - ./artifacts/acceptance:/acceptance
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [SYS_ADMIN, NET_ADMIN]
+    security_opt: [seccomp=unconfined]
+    shm_size: 1gb
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wormhole_accept_admin
+      POSTGRES_USER: wormhole
+      POSTGRES_PASSWORD: isolated-test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wormhole -d wormhole_accept_admin"]
+      interval: 2s
+      timeout: 5s
+      retries: 20

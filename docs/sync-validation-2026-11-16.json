@@ -1,0 +1,283 @@
+{
+  "date": "2026-11-16",
+  "environment": "isolated Linux Docker, Node.js 22.23.2, PostgreSQL 16, Pi SDK 1.5.2",
+  "results": [
+    {
+      "file": "browser-workspace.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 10757,
+      "sha256": "a04f1a888c86cd669606f345c511cbaa4b81d34c5531f81c24e713c67858bf0f"
+    },
+    {
+      "file": "conversations.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 6465,
+      "sha256": "9929735c37c4db1de47a400c8a52a7c0f69d14b0ffd9f42e03ce6972c4696482"
+    },
+    {
+      "file": "extensions.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 246,
+      "sha256": "08083460de5e678eec4cc58cfd5dc86af9521fa127743d4f3d9aa63aa76772bc"
+    },
+    {
+      "file": "finding-report-jobs.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 5177,
+      "sha256": "4064fe41ab5cc00d4885398518f42f801cbb9fbe3d96d6dd4684e195dabe3922"
+    },
+    {
+      "file": "finding-report-native.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 4918,
+      "sha256": "4c0ba98de359acddc903f5960c8745b7cba7d046254f319c454ed9f2910fc74c"
+    },
+    {
+      "file": "fresh-install.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 2454,
+      "sha256": "aba61948298dacc54a5fa8648928e8c7658da3c88a0d023df3ae6d78ceb49520"
+    },
+    {
+      "file": "llm-records.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 9770,
+      "sha256": "daf8de00bbdfdc17317fe5df9e7122afd8a520f0e8800fe08f540016aea93564"
+    },
+    {
+      "file": "mcp-session.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 9056,
+      "sha256": "2d8da262e8d56620d7fdf6b4c55da4d34ef72784dc12dd9e319d72b4ee305d3f"
+    },
+    {
+      "file": "methodology-skills.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 3063,
+      "sha256": "4b9c0f50e0aa656134b3cc6790023c264b44f6e26287cd88430c4ed1615b345f"
+    },
+    {
+      "file": "modeling-admission.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 4586,
+      "sha256": "aa8fa976be8757ef780135173c58910ad30dd0673e8e032ba28de5d905f7f043"
+    },
+    {
+      "file": "modeling-parallel.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 41557,
+      "sha256": "c739c38d1b2dc86a8df8496e226f729d69185d24cec3b6be4d8bd933f135a0b8"
+    },
+    {
+      "file": "modeling.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 26,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 19377,
+      "sha256": "0c30dca5a84576bb828c95d78e1e9f234f22da3a61d49cad03a7940a42e1d8bb"
+    },
+    {
+      "file": "open-source-sync-upgrade.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 1818,
+      "sha256": "81e8b53ced5433d6b66064464572b519c3aebee97398df4d27ae35f8fa69f573"
+    },
+    {
+      "file": "resource-visibility.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 4835,
+      "sha256": "e498f6842b63547834d114f212b35cb0937b977d81116323d9478d7350496ad9"
+    },
+    {
+      "file": "storage-lifecycle.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 18304,
+      "sha256": "86485708ec699ffbe0ed1301f160f1e610bb8b61acd9b72f7f82084f7149e4de"
+    },
+    {
+      "file": "storage-native.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 5050,
+      "sha256": "4ac30dfa5e5c45b155872a183e67fac97f978507852383acb675596da618516e"
+    },
+    {
+      "file": "storage-records.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 2668,
+      "sha256": "efec5361f71786b60acdc7c341f7d60c91035c67099649af6e0aff331da00da2"
+    },
+    {
+      "file": "task-archives.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 17033,
+      "sha256": "3e29f5bfc4a19695b33cae13719bdf8f7fb4c1e07561d04825d8df8b74d2aee5"
+    },
+    {
+      "file": "task-resources.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 3608,
+      "sha256": "a606c7f49b1477af133f540facf35af0161dd2711f3cdf7e32f1a74fde8a90d2"
+    },
+    {
+      "file": "task-slots.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 581,
+      "sha256": "1ba17869916f2933822e742eaf990f89853c50199d271d1f1c47b4839b7a0ff2"
+    },
+    {
+      "file": "workflow-skill.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 440,
+      "sha256": "b5c8ec0f48cd20519a088fe76156a7d949f45a6b8e502c8a025e4c98d7c4d3aa"
+    },
+    {
+      "file": "workflow-worker.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 5780,
+      "sha256": "8254bba2b174e79d2d66e9161513006f58ae9d123684fe808163085fe417aaee"
+    },
+    {
+      "file": "workspace-cleanup.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 16,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 5170,
+      "sha256": "0c5b8567f8b41256f5c0f8375d45ef272df73b735c71309951c025193c132d49"
+    },
+    {
+      "file": "workspace-session-map.test.ts",
+      "exitCode": 0,
+      "timedOut": false,
+      "tests": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 11187,
+      "sha256": "3d936921ae8cbd1a0d41fcf10bfac78e52102a3e24671947851a6488aac1bd5e"
+    }
+  ],
+  "totals": {
+    "tests": 132,
+    "passed": 132,
+    "failed": 0,
+    "skipped": 0
+  },
+  "python": {
+    "file": "workflow-tools.test.py",
+    "passed": 16,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "frontendStaticBuild": "passed"
+}

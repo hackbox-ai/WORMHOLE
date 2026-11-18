@@ -1,0 +1,46 @@
+name: wormhole
+services:
+  wormhole:
+    image: ${WORMHOLE_IMAGE:-wormhole:0.1.0}
+    build:
+      context: .
+      target: core
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${WORMHOLE_BIND:-127.0.0.1}:${WORMHOLE_PORT:-18887}:18887"
+    environment:
+      WORMHOLE_PUBLIC_PORT: ${WORMHOLE_PUBLIC_PORT:-${WORMHOLE_PORT:-18887}}
+      WORMHOLE_DB_HOST: postgres
+      WORMHOLE_DB_NAME: wormhole
+      WORMHOLE_DB_USER: wormhole
+      WORMHOLE_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - runtime:/var/lib/wormhole
+    shm_size: 1gb
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "node", "/opt/wormhole/docker/healthcheck.mjs"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wormhole
+      POSTGRES_USER: wormhole
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wormhole -d wormhole"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+volumes:
+  runtime:
+  database:

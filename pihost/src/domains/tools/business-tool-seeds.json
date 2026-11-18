@@ -1,0 +1,916 @@
+[
+ {
+  "Key": "graph_overview",
+  "Desc": "(Exploration link diagram) Exploration situation distillation summary: asset count, interfaceless site, frontier, discovery, hints (strategic hints from human/master agent, must be included when generating intent). Adjust it first when planning.",
+  "Schema": {
+   "properties": {},
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "list_findings",
+  "Desc": "List [confirmed vulnerabilities] of this task and directly related tasks (compact: id+task_id+intent_id+vulnclass+severity+summary+status). Associated task entries have source_task_id/inherited=true and are read-only. Only vulnerabilities are included here; use list_facts for general facts and node_detail(id) for details.",
+  "Schema": {
+   "properties": {},
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker",
+   "pentest"
+  ]
+ },
+ {
+  "Key": "list_facts",
+  "Desc": "List the [Exploration Facts/Conclusions] of this task and directly related tasks in pages, with the latest first (compact: id+summary+status, the summary will be truncated if it is too long, use node_detail(id) for the full text). All parameters are optional: limit (default 20, upper limit 100), before (cursor, next_before returned by passing the previous page takes the older page; omit /0 = latest page), q (filter by summary keyword). Return {facts, total, has_more, next_before}: total is the filtered total, and when has_more=true, use next_before to continue page turning. Associated task entries have source_task_id/inherited=true and are read-only. See list_findings for vulnerabilities.",
+  "Schema": {
+   "properties": {
+    "before": {
+     "description": "Paged cursor: only return older facts with id less than this value; omitted or 0 = latest page",
+     "type": "integer"
+    },
+    "limit": {
+     "description": "Number of items returned, default 20, upper limit 100",
+     "type": "integer"
+    },
+    "q": {
+     "description": "Filter by fact summary keyword (not case sensitive); omitted = no filtering",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "node_detail",
+  "Desc": "Get the complete content of the [Exploration Graph Node] of this task or the directly related task by id. Inherited nodes have source_task_id/inherited=true and are read-only. Only the exploration node id returned by list_facts/list_findings/graph_overview; for assets, please use list_assets/asset_neighbors.",
+  "Schema": {
+   "properties": {
+    "id": {
+     "description": "Exploration graph node id (non-asset id)",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker"
+  ]
+ },
+ {
+  "Key": "expand_digest",
+  "Desc": "Expand a cold digest: Return a compact list of its collapsed members (id/summary/state/confidence), with the same shape as the overview recent_facts/recent_done_intents. To request complete details/evidence of a piece of information, use node_detail(member_id).",
+  "Schema": {
+   "properties": {
+    "id": {
+     "description": "digest node id (from overview cold_digests)",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "get_worker_output",
+  "Desc": "Get the final output conclusion of this task or an intention (work) directly related to the task. The associated task results have source_task_id/inherited=true and are read-only. A normal end returns its summary; a stopped/abnormal work returns its last output up to the time of abort.",
+  "Schema": {
+   "properties": {
+    "intent_id": {
+     "description": "Intent id (= work handle)",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "intent_id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "get_worker_trace",
+  "Desc": "View the [execution process] of a certain intention (work) (different from get_worker_output which only gives the final conclusion). Three usages:\n① Only pass intent_id → Return the summary stream of each step of the work (summary ≤ 100 words, including step_id; only the action outline, not including complete output);\n② intent_id + q → only returns the summary of steps that hit the keyword (search in both summary and complete output; still only gives summary, use ③ to see the content);\n③ intent_id + step_ids → Return the complete content (detail) of these steps; a maximum of 5 can be taken at a time. If the number exceeds 5, only the first 5 will be returned and the untaken ones will be notified in notice/omitted_step_ids.\nTypical process: First ①/② locate the step_id of the suspicious step, and then use ③ to obtain its complete output. There is no thinking step. Supports historical traces directly associated with tasks; the results have source_task_id/inherited=true and are read-only.",
+  "Schema": {
+   "properties": {
+    "intent_id": {
+     "description": "Intent id (= work handle)",
+     "type": "integer"
+    },
+    "limit": {
+     "description": "Return limit for summary streams/retrievals (optional)",
+     "type": "integer"
+    },
+    "q": {
+     "description": "Keyword: only return summary/full output of steps that hit it (optional; mutually exclusive with step_ids)",
+     "type": "string"
+    },
+    "step_ids": {
+     "description": "To get the step_id of the complete content (returned from ①/②; up to 5 are taken at a time, only the first 5 are returned for multi-pass, and the rest are listed in omitted_step_ids)",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "intent_id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker"
+  ]
+ },
+ {
+  "Key": "search_all_worker_traces",
+  "Desc": "[It is usually not recommended because most of the information has been given in the system] Search by keyword (q) in [Execution process of other work in this task] - used to retrieve things that a worker has seen but has not been written into fact (a certain path/token/error report, etc.). Your own steps for this intention (those already in your context) are automatically excluded. Only the summary of hit steps (summary≤100 words) is returned, each with intent_id; based on this, use get_worker_trace(intent_id, step_ids=[...]) to get the complete content.",
+  "Schema": {
+   "properties": {
+    "limit": {
+     "description": "Return the upper limit, default 100 (optional)",
+     "type": "integer"
+    },
+    "q": {
+     "description": "Keywords (search in summary + complete output of all work steps)",
+     "type": "string"
+    }
+   },
+   "required": [
+    "q"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker"
+  ]
+ },
+ {
+  "Key": "add_hint",
+  "Desc": "Hook the human/master agent's strategic prompts to the exploration graph and the planner will read it the next time it generates an intent.\n★Priority batch: Put multiple hints into the hints array and submit them at once (saving round trips than calling them one by one). Returns an array of ids, in the same length and order as hints (failure item id=0, see errors for details). For a single item, hints are omitted and given directly to the top-level text.",
+  "Schema": {
+   "properties": {
+    "asset_ids": {
+     "description": "Anchored asset id (optional, 0/1/multiple)",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "hints": {
+     "description": "[Use this first] The prompt array to be added will be processed in order. Each element field is the same as the top-level field below (text/asset_ids/traffic_refs). The returned ids are of the same length and order as this array.",
+     "items": {
+      "properties": {
+       "asset_ids": {
+        "items": {
+         "type": "integer"
+        },
+        "type": "array"
+       },
+       "text": {
+        "description": "Prompt content",
+        "type": "string"
+       },
+       "traffic_refs": {
+        "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+        "items": {
+         "properties": {
+          "note": {
+           "description": "What conclusion does this flow support?",
+           "type": "string"
+          },
+          "role": {
+           "description": "baseline / proof / verification / supporting",
+           "type": "string"
+          },
+          "traffic_id": {
+           "description": "Real Traffic ID",
+           "type": "string"
+          }
+         },
+         "required": [
+          "traffic_id"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "text": {
+     "description": "[Single item] Prompt content, such as 'Focus on mining post-certification interfaces'",
+     "type": "string"
+    },
+    "traffic_refs": {
+     "description": "Optional: The traffic references that have been verified and correspond to the specific vulnerabilities in this tip are kept in order; after handover, report_finding can pass evidence_hint_id carrying these references.",
+     "items": {
+      "properties": {
+       "note": {
+        "description": "What conclusion does this flow support?",
+        "type": "string"
+       },
+       "role": {
+        "description": "baseline / proof / verification / supporting",
+        "type": "string"
+       },
+       "traffic_id": {
+        "description": "Real Traffic ID",
+        "type": "string"
+       }
+      },
+      "required": [
+       "traffic_id"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent"
+  ]
+ },
+ {
+  "Key": "add_intent",
+  "Desc": "Generate [exploration direction] and write it into frontier, and connect it to the exploration link. The intention is an open exploration direction, not a fixed type - use a summary to freely describe what to explore/verify/exploit.\n★Priority batch: Multiple new directions filtered out in one round are put into the intents array and submitted at once (saving round trips than calling one by one). Returns an array of ids, in the same length and order as intents (failure item id=0, see errors for details). For a single item, the intents are omitted and given directly to the top-level summary.",
+  "Schema": {
+   "properties": {
+    "asset_ids": {
+     "description": "[Target asset ID] to be tested/attacked in this direction (**try to pass**, 0/1/multiple; it is the asset ID returned by list_assets, not the exploration node ID): which assets (site/interface/parameter/host, etc.) this exploration direction targets. As long as the direction revolves around certain specific assets, it must be uploaded - it is a structured markup of \"what goals are this exploration targeting?\" and is used to cover duplication and connect intentions to asset links. Only leave this blank if it is pure global reconnaissance and there really are no specific target assets.",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "intents": {
+     "description": "[Use this first] The array of exploration directions to be added is processed in order. Each element field is the same as the top-level field below (summary/asset_ids/parent_ids/priority). The returned ids are of the same length and order as this array.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "parent_ids": {
+     "description": "Upstream anchor id (optional, 0/1/multiple): This direction is derived from the [confirmed facts/findings]. **Only existing fact/finding node ids can be filled in, not intentions/goals/prompts** - Intentions must be anchored on confirmed knowledge, driven by discovery rather than planning out of thin air. If multiple facts jointly generate a new intention, please pass multiple; please leave the top-level new reconnaissance direction blank (it will automatically be linked to the origin fact of the task).",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "priority": {
+     "description": "Priority 0-10, default 5",
+     "type": "integer"
+    },
+    "summary": {
+     "description": "[Single article] Describe this exploration direction in one sentence: what to do + why. Just write the direction clearly and it does not depend on the asset ID.",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "steer_work",
+  "Desc": "Inject corrective instructions into a running intention (work) in real time without interrupting it or losing the progress made: the worker will receive your instructions and adjust accordingly before taking the next step. Used for [in-intention] corrections such as 'Don't go to X, focus on Y'; if the direction is completely wrong, you should use kill_work and then set a new intention. It is recommended to use get_worker_output first to see what it is doing.",
+  "Schema": {
+   "properties": {
+    "intent_id": {
+     "description": "Intent id to correct (= work handle)",
+     "type": "integer"
+    },
+    "message": {
+     "description": "Corrective instructions to the worker, clearly telling it what to stop and what to turn to",
+     "type": "string"
+    }
+   },
+   "required": [
+    "intent_id",
+    "message"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "set_goals",
+  "Desc": "Add a new exploration goal to [this task]. Objective = final deliverable/verifiable outcome, not attack steps or reconnaissance actions.\n★Priority batch: Put multiple goals into the goals array and submit them once, and return ids with the same length and order (failure item id=0, see errors for details). For a single article, goals are omitted and given directly to the top-level text.\nvulnclass optional: corresponding to the vulnerability class (such as SQLi/IDOR), the business logic class target is left blank. Whether the goal is achieved or not is determined by the system and marked as met. This tool is only responsible for new additions.",
+  "Schema": {
+   "properties": {
+    "goals": {
+     "description": "[Use this first] The target array to be added is processed in order. Each element: text (required, an independently verifiable end goal) + vulnclass (optional). The returned ids are of the same length and order as this array.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "text": {
+     "description": "[Single Article] An independently verifiable end goal",
+     "type": "string"
+    },
+    "vulnclass": {
+     "description": "[Single entry] Corresponding vulnerability class (if clear), such as SQLi/IDOR; business logic target can be left blank",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "goals"
+  ]
+ },
+ {
+  "Key": "set_constraints",
+  "Desc": "Add operation constraints to [this task] to frame the exploration boundary: type=allow (operations allowed) or deny (operations prohibited).\nConstraints = regulations on \"what operations can/cannot be done\" (such as \"only test the current port, do not scan other ports\", \"forbidden to write operations to the production library\", \"only allow passive reconnaissance\"), not the goal, nor the attack step.\n★Priority batch: Put multiple items into the constraints array and submit them at once, and return ids with the same length and order (failure item id=0, see errors for details). For a single item, constraints are omitted and given directly to the top-level text/type.\nOnly register the [clearly written] constraints in the task goal/description, do not make them up; use deny (more conservative) when you are not sure about the type.",
+  "Schema": {
+   "properties": {
+    "constraints": {
+     "description": "[Use this first] The constraint array to be added is processed in order. Each element: text (required, one constraint) + type (allow|deny). The returned ids are of the same length and order as this array.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "text": {
+     "description": "[Single item] The content of an operation constraint",
+     "type": "string"
+    },
+    "type": {
+     "description": "[Single item] allow (allow) or deny (forbidden); default processing is deny",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "goals"
+  ]
+ },
+ {
+  "Key": "insert_assets",
+  "Desc": "Batch registration of newly discovered assets, multiple types can be mixed at one time (see enumeration for type).\nRequired fields for each type: root_domain→domain; ip→ip (must be IPv4/IPv6, not host name); subdomain→domain; app→app_name; service(HTTP)→url; service (non-HTTP)→service_name+port (fill in at least one ip/domain); endpoint→url+method. The meaning of the remaining fields can be found in their respective descriptions.\nauth/technologies/params is appended and does not overwrite the original value.\nReturn: {results:[{index,id,type}], errors:[{index,error}]}",
+  "Schema": {
+   "properties": {
+    "assets": {
+     "description": "Asset array, each element corresponds to an asset record",
+     "items": {
+      "properties": {
+       "app_icp": {
+        "description": "Apply ICP filing (optional)",
+        "type": "string"
+       },
+       "app_name": {
+        "description": "Application name (required for app type)",
+        "type": "string"
+       },
+       "auth": {
+        "description": "List of discovered authentication information, each containing fields such as type/username/password (optional, appending will not overwrite)",
+        "items": {
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "bound_domains": {
+        "description": "List of domain names bound to this IP (ip type optional)",
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "bundle_id": {
+        "description": "Bundle ID (optional for app type)",
+        "type": "string"
+       },
+       "category": {
+        "description": "Application classification (optional)",
+        "type": "string"
+       },
+       "company_id": {
+        "description": "Attributing company id (optional for app type; app cannot be automatically attributed by scope and needs to be specified explicitly. id is returned by add_company_scope)",
+        "type": "integer"
+       },
+       "content_length": {
+        "description": "HTTP response body bytes (optional)",
+        "type": "integer"
+       },
+       "description": {
+        "description": "Application description (optional)",
+        "type": "string"
+       },
+       "domain": {
+        "description": "Root domain name or subdomain name (root_domain/subdomain required)",
+        "type": "string"
+       },
+       "favicon_mmh3": {
+        "description": "favicon MMH3 hash (optional)",
+        "type": "string"
+       },
+       "icp": {
+        "description": "ICP registration number (optional)",
+        "type": "string"
+       },
+       "ip": {
+        "description": "IP address must be an IPv4/IPv6 address, and the host name cannot be filled in (please use the domain field of type=subdomain for the host name); the ip type is required; the service/endpoint type can be filled in and is used to associate IP",
+        "type": "string"
+       },
+       "method": {
+        "description": "HTTP method: GET/POST/PUT/PATCH/DELETE, etc. (endpoint is required)",
+        "type": "string"
+       },
+       "open_ports": {
+        "description": "Open port list (ip type optional)",
+        "items": {
+         "properties": {
+          "port": {
+           "description": "port number",
+           "type": "integer"
+          },
+          "service": {
+           "description": "Service name, such as http/ssh/mysql, etc. (optional)",
+           "type": "string"
+          }
+         },
+         "required": [
+          "port"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "page_title": {
+        "description": "Page <title> content (optional)",
+        "type": "string"
+       },
+       "params": {
+        "description": "Request parameter list, each containing location(query/body/header/path)/name/value/type (optional, appending will not overwrite)",
+        "items": {
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "port": {
+        "description": "Port number (required when service is not HTTP)",
+        "type": "integer"
+       },
+       "record_type": {
+        "description": "DNS resolution type: A/AAAA/CNAME/MX, etc. (subdomain optional)",
+        "type": "string"
+       },
+       "record_value": {
+        "description": "List of DNS resolution values ​​(subdomain is optional, such as [\"1.2.3.4\",\"2.3.4.5\"])",
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "service_name": {
+        "description": "Service name, such as ssh/mysql/redis (required when service is not HTTP)",
+        "type": "string"
+       },
+       "status_code": {
+        "description": "HTTP response status code, such as 200/301/403/404 (optional)",
+        "type": "integer"
+       },
+       "technologies": {
+        "description": "Fingerprint/technology stack list, such as [\"Nginx\", \"Vue\", \"Bootstrap\"] (optional)",
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "type": {
+        "description": "Asset Type",
+        "enum": [
+         "root_domain",
+         "ip",
+         "subdomain",
+         "app",
+         "service",
+         "endpoint"
+        ],
+        "type": "string"
+       },
+       "url": {
+        "description": "Full URL, including protocol and port (required for HTTP service; service_type is automatically set to http)",
+        "type": "string"
+       }
+      },
+      "required": [
+       "type"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "assets"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "worker",
+   "auto",
+   "pentest"
+  ]
+ },
+ {
+  "Key": "add_company_scope",
+  "Desc": "Add the domain name/IP/CIDR/ICP registration/enterprise keywords to a company's [Asset Scope] - the domain name, network and ICP will automatically claim the hit assets, and the keywords are only provided to the Agent as a scope prompt.\nThe company name is unique: If company does not exist, create a new one, and if it already exists, reuse it (only merge the scope).\nScope is one line at a time, and the system automatically identifies: root domain name / URL / single IP / CIDR network segment / ICP registration / enterprise keywords.\nBe sure to provide reason with the attribution basis (whois/certificate/ASN, etc.).\nGuardrails: Reject naked TLDs and overly wide network segments (IPv4 prefixes must be /16-/32, IPv6 prefixes must be /32-/128), illegal lines will be skipped and returned in errors.",
+  "Schema": {
+   "properties": {
+    "company": {
+     "description": "Company name (create if it does not exist, reuse if it exists; the name is unique)",
+     "type": "string"
+    },
+    "logo": {
+     "description": "Company icon URL (optional; only valid when creating a new company)",
+     "type": "string"
+    },
+    "reason": {
+     "description": "Basis of attribution (evidence/source), must be filled in",
+     "type": "string"
+    },
+    "scope": {
+     "description": "Asset scope, one line per line: domain name / URL / IP / CIDR / ICP filing / enterprise keywords",
+     "type": "string"
+    }
+   },
+   "required": [
+    "company",
+    "scope"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "auto"
+  ]
+ },
+ {
+  "Key": "list_assets",
+  "Desc": "Query the asset library: DSL expression search, or direct fetching by id/ids; paging is supported. Only assets within the test range of [this task and directly related tasks] will be returned.\nDSL: field=value fuzzy (ILIKE) | field==value precise | field!=value exclusion | numeric field support > >= < <= | bare words = full text fuzzy; AND/OR combination (AND has high priority), grouping with parentheses can be used. Asset types use independent type parameters and are not written into the DSL.\nWhen id/ids are not passed, dsl must be non-empty (unconditional full query is not allowed).\nAvailable fields: domain (root/sub/service domain name), root_domain, ip, url, page_title, icp, service_name, app_name, method (such as GET/POST), service_type (http|other), record_type (such as A/CNAME), technology (array, = fuzzy == precise), port/status_code/company_id (integer).\nExample: status_code>=400 AND technology=shiro; (port==80 OR port==443) AND technology=nginx",
+  "Schema": {
+   "properties": {
+    "dsl": {
+     "description": "DSL query expression (see tool description for syntax/fields). Must be non-empty if id/ids are not passed.",
+     "type": "string"
+    },
+    "id": {
+     "description": "Get directly by individual asset id (optional, mutually exclusive with dsl/type)",
+     "type": "integer"
+    },
+    "ids": {
+     "description": "Get directly by multiple asset IDs (optional, mutually exclusive with dsl/type)",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "limit": {
+     "description": "Return the upper limit, default 10 (optional)",
+     "type": "integer"
+    },
+    "offset": {
+     "description": "Paging offset, default 0 (optional)",
+     "type": "integer"
+    },
+    "type": {
+     "description": "Asset type filtering: root_domain|ip|subdomain|app|service|endpoint (independent field, can be superimposed with dsl; type alone is not enough to query, dsl is still needed)",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker",
+   "auto",
+   "pentest"
+  ]
+ },
+ {
+  "Key": "report_finding",
+  "Desc": "Record confirmed vulnerabilities and use evidence to provide verifiable evidence such as command output and logs. The task context passes the current intent_id. The returned finding_id is the individual vulnerability record ID, and finding_node_id is the discovery node ID (the first row holds the node number).",
+  "Schema": {
+   "properties": {
+    "asset_ids": {
+     "description": "Affected asset id",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "evidence": {
+     "description": "Evidence/PoC text",
+     "type": "string"
+    },
+    "evidence_hint_id": {
+     "description": "Optional: The prompt node ID corresponding to this vulnerability in this task automatically carries its structured traffic_refs; inheritance prompts or prompts of other vulnerabilities cannot be referenced.",
+     "type": "integer"
+    },
+    "intent_id": {
+     "description": "The intent id of the current task",
+     "type": "integer"
+    },
+    "name": {
+     "description": "Vulnerability name",
+     "type": "string"
+    },
+    "severity": {
+     "description": "critical|high|medium|low",
+     "type": "string"
+    },
+    "summary": {
+     "description": "Discovery summary",
+     "type": "string"
+    },
+    "traffic_refs": {
+     "description": "Optional; first search for HTTP/HTTPS vulnerabilities and verify that the request/response indeed supports the vulnerability conclusion one by one, and then fill in the real ID in the order of recurrence. Omit or pass [] when TCP and other non-HTTP vulnerabilities are not collected or the exact record cannot be found, and the report will not be blocked; the reason can be explained in evidence and other verifiable evidence can be provided. Do not guess IDs, infer associations by domain/time, or repeat probes only for patch packets. Purpose baseline normal control / proof vulnerability proof / verification supplementary verification / supporting auxiliary evidence.",
+     "items": {
+      "properties": {
+       "note": {
+        "description": "How does this traffic support the vulnerability conclusion?",
+        "type": "string"
+       },
+       "role": {
+        "enum": [
+         "baseline",
+         "proof",
+         "verification",
+         "supporting"
+        ],
+        "type": "string"
+       },
+       "traffic_id": {
+        "description": "The real traffic ID returned by traffic_search",
+        "type": "string"
+       }
+      },
+      "required": [
+       "traffic_id"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "vulnclass": {
+     "description": "Vulnerability Category",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vulnclass",
+    "severity",
+    "summary"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner",
+   "worker",
+   "auto",
+   "pentest"
+  ]
+ },
+ {
+  "Key": "record_fact",
+  "Desc": "Write the exploration [fact/conclusion] into the exploration graph and connect it to the intention (intent_id) that generated it. Used to record exploration results - including fingerprints/enumerations, etc. [positive conclusions], and 'port closed'/'parameters cannot be injected'/'no login entrance found' etc. [negative conclusions].\n⚠️Multiple observations from an exploration should be [summarized into one fact], do not split into multiple pieces. If they can be combined into one fact, try to express it with one fact: summary = a concluding sentence for this conclusion, detail = relevant details (can contain multiple specific items). Example: Fingerprint intent → a fact {summary:'Identified the technology stack and response characteristics of the An intention usually produces only one fact. If it is broken down too much, the graph will expand infinitely.\n★The facts array is used to write multiple [different from each other] conclusions at one time (the intent_id can be omitted for each one, and the top-level intent_id is used by default). Returns the ids array, in the same length and order as facts.\n⚠️Only write the conclusions you [actually see] in the tool output, don’t make up your mind. evidence and confidence are used to prevent inaccurate conclusions from contaminating the graph:\n  · evidence = [one line] key evidence to support this conclusion (command + one or two lines of output that best proves it), **must be concise** - the details are already in detail, don't stick to a large section of output here.\n  · confidence=observed (directly seen in the output) | inferred (inferred from the phenomenon).\n  · **Negative conclusion** (cannot be injected/port closed/no entrance found, etc.) only write \"observation + exploratory reading\" - state what you actually saw, whether the direction is given up is determined by the planner comprehensively; be sure to mark evidence, if the means are not exhausted or the evidence is weak (including only exploring once, it looks like), mark it as inferred, mark it as observed if it is indeed exhausted and directly seen.",
+  "Schema": {
+   "properties": {
+    "asset_ids": {
+     "description": "Related asset id (optional, 0/1/multiple): which assets are involved in this fact",
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    },
+    "confidence": {
+     "description": "observed (directly seen in the output) | inferred (inferred from the phenomenon). Negative conclusions must be labeled truthfully.",
+     "type": "string"
+    },
+    "detail": {
+     "description": "Relevant details for this fact: Write multiple observations from this exploration here",
+     "type": "string"
+    },
+    "evidence": {
+     "description": "[One line] Key evidence: command + the one or two lines of output that best prove the conclusion. Be concise and don’t stick to large sections of output (please leave details in detail).",
+     "type": "string"
+    },
+    "facts": {
+     "description": "[Use when there are multiple different conclusions] Fact array, the element field is the same as the top-level field below (summary/detail/evidence/confidence/intent_id/asset_ids); if intent_id is omitted, the top-level intent_id is used. The returned ids are of the same length and order as this array.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "intent_id": {
+     "description": "The intent id that generated this fact (the intent you received; used as the default for each item in batches)",
+     "type": "integer"
+    },
+    "summary": {
+     "description": "[Concluding sentence] for the conclusion of this exploration (a summary of detail)",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "worker"
+  ]
+ },
+ {
+  "Key": "add_task_scope",
+  "Desc": "Add the test scope to [this task] - this is the authorization boundary of this task and also the denominator of asset test coverage.\nkind supports: company (assets under the entire company's name) / root_domain (the entire root domain, including all subdomains) / subdomain (a single precise subdomain) / ip / cidr / icp / keyword.\nDescription: Hosts encountered by workers one by one will be [automatically] added to the scope (precise subdomain) by the system; this tool is used to [active expansion] - include the entire root domain/entire company, or additionally specify a certain subdomain/IP.\nvalue: company passes the company name or id (the company must already exist); root_domain/subdomain passes the domain name; ip/cidr passes the IP or network segment; icp/keyword passes the registration number or company keyword.\nBe sure to give reason a basis (auditable). Use the entries array for multiple entries.",
+  "Schema": {
+   "properties": {
+    "entries": {
+     "description": "Batch: [{kind, value}]. kind∈company/root_domain/subdomain/ip/cidr/icp/keyword.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "kind": {
+     "description": "[Single entry] company/root_domain/subdomain/ip/cidr/icp/keyword",
+     "type": "string"
+    },
+    "reason": {
+     "description": "Basis for joining (for audit), be sure to fill in",
+     "type": "string"
+    },
+    "value": {
+     "description": "[Single entry] Company name or id / domain name / IP / CIDR / ICP / keyword",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "list_untested_assets",
+  "Desc": "Query the assets within the scope of [this task and directly related tasks] that have not been covered by fact anchors (the related range is read-only, for you to judge whether to make a supplementary test, and does not make decisions for you).\nOptional filtering by asset type: root_domain/subdomain/service/app/endpoint/ip.\nPagination: page starts from 1, page_size defaults to 10. Return {assets:[{id,type,label}], total, page, page_size}. Only task context is available.",
+  "Schema": {
+   "properties": {
+    "page": {
+     "description": "Page number, starting from 1 (default 1)",
+     "type": "integer"
+    },
+    "page_size": {
+     "description": "Number per page (default 10)",
+     "type": "integer"
+    },
+    "type": {
+     "description": "Asset type filtering (optional): root_domain/subdomain/service/app/endpoint/ip",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "mainagent",
+   "planner"
+  ]
+ },
+ {
+  "Key": "list_goals",
+  "Desc": "List the target nodes of this task and their status (open/met) to determine whether they have been achieved.",
+  "Schema": {
+   "properties": {},
+   "type": "object"
+  },
+  "Agents": [
+   "planner"
+  ]
+ },
+ {
+  "Key": "prove_goal",
+  "Desc": "Called when you judge that a discovery/fact proves that a certain goal has been achieved: connect the evidence node to the target node and mark the target met.",
+  "Schema": {
+   "properties": {
+    "evidence_id": {
+     "description": "the discovery/fact node id that proves it",
+     "type": "integer"
+    },
+    "goal_id": {
+     "description": "target node id",
+     "type": "integer"
+    },
+    "reason": {
+     "description": "Why does this evidence meet this goal?",
+     "type": "string"
+    }
+   },
+   "required": [
+    "goal_id",
+    "evidence_id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "planner"
+  ]
+ },
+ {
+  "Key": "goal_met",
+  "Desc": "[End the entire mission immediately] - Only call it when you confirm that [all goals of the mission have been truly achieved and the overall conclusion] (note that the mission is [whole] completed; only achieving a certain goal/a flag/a vulnerability [does not count] - in that case, just mark the goal with prove_goal). ⚠️It is not used to \"end this round of planning\": if there are no new intentions to send in this round, or if you are waiting for worker output, just [end the round directly, do not adjust this tool] (0 intentions is completely normal). In normal judgment, priority is given to using prove_goal to prove the goals one by one; goal_met is just a means to bypass proving one by one and directly end from the overall situation.",
+  "Schema": {
+   "properties": {
+    "reason": {
+     "description": "Reason for achievement (must be evidence that the goal has been truly achieved, and cannot be a reason to end the round such as \"there is no new direction in this round\")",
+     "type": "string"
+    }
+   },
+   "required": [
+    "reason"
+   ],
+   "type": "object"
+  },
+  "Agents": []
+ },
+ {
+  "Key": "kill_work",
+  "Desc": "Terminate a running intent (work). Used to stop wandering/meaningless exploration; the terminated intention is marked as stopped and will no longer be automatically regained. Use get_worker_output first to see what it is doing before deciding.",
+  "Schema": {
+   "properties": {
+    "intent_id": {
+     "description": "Intent id to terminate (= work handle)",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "intent_id"
+   ],
+   "type": "object"
+  },
+  "Agents": [
+   "planner"
+  ]
+ },
+ {
+  "Key": "list_companies",
+  "Desc": "List the [enterprise/company] in the asset library, their asset scope and the number of vested assets. Used to check which companies there are and get the company_id (used when insert_assets is associated with the app and list_assets is filtered by company_id). Optional search: fuzzy filter by company name (not case sensitive), leave blank to return all.",
+  "Schema": {
+   "properties": {
+    "search": {
+     "description": "Fuzzy filter by company name (optional, case-insensitive); leave blank to return all",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Agents": [
+   "planner",
+   "auto",
+   "pentest"
+  ]
+ }
+]

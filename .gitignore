@@ -1,36 +1,27 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg-info/
-.eggs/
-dist/
-build/
-.venv/
-venv/
-
-# 环境变量与本地密钥配置（严禁提交）
+**/node_modules/
+web/.next/
+web/out/
+**/dist/
+**/*.tsbuildinfo
+web/next-env.d.ts
 .env
 .env.*
-.webui_config.json
-
-# 运行产物
-solver_runs/
-solver-prompts/
-*.flagstate.json
-*.tar.gz
-*.log
-
-# 数据库
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-
-# IDE / 系统
-.idea/
+!.env.example
+**/config.local.json
+**/config.test.json
+/data/
+**/jwt.key
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/__pycache__/
+**/*.pyc
+pihost/vendor/fingerprint/
+.playwright-cli/
+.playwright-mcp/
 .vscode/
-*.swp
+.idea/
 .DS_Store
 Thumbs.db
+*.log
+/artifacts/

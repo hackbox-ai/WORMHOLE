@@ -1,0 +1,2 @@
+-- 0020_agent_run_seconds.sql — agents.run_seconds Baseline value alignment（goals/planner/mainagent/worker/auto/reporter/retester=1200，pentest=0）
+UPDATE agents SET run_seconds = CASE key WHEN 'pentest' THEN 0 ELSE 1200 END;

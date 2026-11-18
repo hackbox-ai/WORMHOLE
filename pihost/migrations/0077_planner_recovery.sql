@@ -1,0 +1,7 @@
+CREATE TABLE task_planner_recovery (
+  task_id BIGINT PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+  model_revision TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
+  blocked BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

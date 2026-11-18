@@ -1,0 +1,600 @@
+"use client";
+
+import { WorkspaceHeader } from "@/components/workspace-header";
+
+import * as React from "react";
+import {
+  RadioIcon,
+  SearchIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Loader2Icon,
+  XIcon,
+  Trash2Icon,
+  CopyIcon,
+  CheckIcon,
+} from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+import { RecordSurface } from "@/components/workbench-layout";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import type { LLMRecordItem, LLMRecordDetail, LLMTask } from "@/lib/types";
+
+function fmtTime(ts: string) {
+  return new Date(ts).toLocaleString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function fmtLatency(ms: number) {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function fmtTokens(n: number) {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function tryFormatJSON(s: string): string {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
+}
+
+// A small button that copies the text in the current box. A check mark will appear briefly after the copy is successful.。text is empty/Disabled when placeholder only。
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const disabled = !text;
+  const copy = async () => {
+    if (disabled) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // navigator.clipboard In non-security context(Such as http LAN)Not available, fallback to execCommand。
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* Ignore: silent if not supported */
+      }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-5 shrink-0"
+      disabled={disabled}
+      title={copied ? "Copied" : "Copy content"}
+      onClick={copy}
+    >
+      {copied ? <CheckIcon className="size-3 text-emerald-600" /> : <CopyIcon className="size-3" />}
+    </Button>
+  );
+}
+
+const PAGE_SIZES = [25, 50, 100];
+
+export default function LLMRecordsPage() {
+  const [page, setPage] = React.useState(0);
+  const [size, setSize] = React.useState(50);
+  const [session, setSession] = React.useState("");
+  const [sessionQ, setSessionQ] = React.useState("");
+  const [model, setModel] = React.useState("");
+
+  const [records, setRecords] = React.useState<LLMRecordItem[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
+
+  // Recording on/off toggle (settings.llm_record; default off). When off the
+  // backend records nothing.
+  const [recEnabled, setRecEnabled] = React.useState(false);
+  const [recBusy, setRecBusy] = React.useState(false);
+
+  // Inline detail panel (Burp-style split, not a dialog)
+  const [selected, setSelected] = React.useState<LLMRecordItem | null>(null);
+  const [detail, setDetail] = React.useState<LLMRecordDetail | null>(null);
+  const [detailLoading, setDetailLoading] = React.useState(false);
+  // Normalized View / HTTP Original text view. The original text is a troubleshooting provider The only basis for side problems: normalized view
+  // Tools not included schema，Not in the response either tool_use Block。
+  const [rawView, setRawView] = React.useState(false);
+
+  const hasRaw = !!(detail?.raw_request || detail?.raw_response);
+  // The switch maintains the user selection, but automatically falls back to the parsing view when switching to an old record without original text, instead of showing blank。
+  const showRaw = rawView && hasRaw;
+  // The original request body is JSON，pretty-print Only change the formatting but not the semantics, making it easier to read; the original response is SSE
+  // Frame，tryFormatJSON If the parsing fails, it will be returned as is, so both sides can share one function.。
+  const reqText = showRaw
+    ? detail?.raw_request && tryFormatJSON(detail.raw_request)
+    : detail?.request_body && tryFormatJSON(detail.request_body);
+  const respText = showRaw ? detail?.raw_response : detail?.response_body && tryFormatJSON(detail.response_body);
+
+  // Per-task delete (task picker + confirm dialog)
+  const [tasks, setTasks] = React.useState<LLMTask[]>([]);
+  const [pickedTask, setPickedTask] = React.useState("");
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [reloadTick, setReloadTick] = React.useState(0); // manual refetch trigger
+
+  // Load recording toggle state on mount.
+  React.useEffect(() => {
+    let alive = true;
+    api
+      .settings()
+      .then((s) => {
+        if (alive) setRecEnabled(!!s.llm_record);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggleRecording = async (on: boolean) => {
+    setRecBusy(true);
+    setRecEnabled(on); // optimistic
+    try {
+      const s = await api.setSettings({ llm_record: on });
+      setRecEnabled(!!s.llm_record);
+    } catch {
+      setRecEnabled(!on); // revert on failure
+    } finally {
+      setRecBusy(false);
+    }
+  };
+
+  // Debounce session filter.
+  React.useEffect(() => {
+    const t = setTimeout(() => setSessionQ(session.trim()), 300);
+    return () => clearTimeout(t);
+  }, [session]);
+
+  // Reset page on filter change.
+  React.useEffect(() => {
+    setPage(0);
+  }, [sessionQ, model, size, pickedTask]);
+
+  // Load list.
+  React.useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    api
+      .llmRecords({
+        model: model || undefined,
+        session: sessionQ || undefined,
+        task: pickedTask || undefined,
+        page,
+        size,
+      })
+      .then((r) => {
+        if (!alive) return;
+        setRecords(r.records ?? []);
+        setTotal(r.total ?? 0);
+      })
+      .catch(() => {})
+      .finally(() => alive && setLoading(false));
+    api
+      .llmTasks()
+      .then((r) => {
+        if (alive) setTasks(r.tasks ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [page, size, sessionQ, model, pickedTask, reloadTick]);
+
+  // Delete every LLM record for the picked task, then refetch.
+  const confirmDelete = () => {
+    setDeleting(true);
+    api
+      .llmRecordsDeleteTask(pickedTask)
+      .then(() => {
+        setDeleteOpen(false);
+        setSelected(null);
+        setDetail(null);
+        setPickedTask("");
+        setPage(0);
+        setReloadTick((t) => t + 1);
+      })
+      .catch(() => {})
+      .finally(() => setDeleting(false));
+  };
+
+  // Lazy-load full request/response when a row is selected.
+  React.useEffect(() => {
+    if (!selected) {
+      setDetail(null);
+      return;
+    }
+    let alive = true;
+    setDetailLoading(true);
+    setDetail(null);
+    api
+      .llmRecordDetail(selected.id)
+      .then((d) => {
+        if (alive) setDetail(d);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setDetailLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selected]);
+
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  const rangeStart = total === 0 ? 0 : page * size + 1;
+  const rangeEnd = page * size + records.length;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-1 items-center justify-between gap-3">
+          <WorkspaceHeader title="Large model Trace" compact />
+          <Badge variant="secondary">{total}</Badge>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="workspace-toolbar flex flex-wrap items-center gap-2">
+        <div className="relative max-w-sm flex-1">
+          <SearchIcon className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search session ID…"
+            value={session}
+            onChange={(e) => setSession(e.target.value)}
+            className="h-8 pl-8"
+          />
+        </div>
+        <Input placeholder="Model name" className="h-8 w-48" value={model} onChange={(e) => setModel(e.target.value)} />
+        <Select value={pickedTask} onValueChange={setPickedTask}>
+          <SelectTrigger size="sm" className="w-56">
+            <SelectValue placeholder="Select task..." />
+          </SelectTrigger>
+          <SelectContent>
+            {tasks.length === 0 ? (
+              <SelectItem value="__none__" disabled>
+
+                No task record yet
+              </SelectItem>
+            ) : (
+              tasks.map((t) => (
+                <SelectItem key={t.task_id} value={t.task_id}>
+                  <span className="font-mono">#{t.task_id}</span>
+                  <span className="ml-2 text-muted-foreground">（{t.count}）</span>
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="h-8"
+          disabled={!pickedTask || deleting}
+          title={pickedTask ? undefined : "Select the task above first"}
+          onClick={() => setDeleteOpen(true)}
+        >
+          <Trash2Icon className="size-3.5" />
+
+          Delete task dialog
+        </Button>
+        <Select value={String(size)} onValueChange={(v) => setSize(Number(v))}>
+          <SelectTrigger size="sm" className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZES.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}  /page
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Recording on/off — off means no LLM calls are recorded */}
+        <div className="flex items-center gap-2 rounded-md border px-2.5 py-1">
+          <Switch
+            id="llm-rec-toggle"
+            size="sm"
+            checked={recEnabled}
+            onCheckedChange={toggleRecording}
+            disabled={recBusy}
+          />
+          <label
+            htmlFor="llm-rec-toggle"
+            className={cn(
+              "cursor-pointer text-xs font-medium select-none",
+              recEnabled ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {recEnabled ? "Recording" : "Closed"}
+          </label>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            {rangeStart}–{rangeEnd} / {total}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            disabled={page <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            <ChevronLeftIcon />
+          </Button>
+          <span className="tabular-nums">
+            {page + 1} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            disabled={page + 1 >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          >
+            <ChevronRightIcon />
+          </Button>
+        </div>
+      </div>
+
+      {/* History table + inline detail (Burp-style split) */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <RecordSurface className="flex min-h-0 flex-1 flex-col overflow-hidden py-0">
+          <div className="min-h-0 flex-1 overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-card">
+                <TableRow>
+                  <TableHead className="w-[130px]">Time</TableHead>
+                  <TableHead className="w-[60px]">Task</TableHead>
+                  <TableHead className="w-[90px]">Worker</TableHead>
+                  <TableHead className="w-[100px]">Profile</TableHead>
+                  <TableHead className="w-[140px]">Model</TableHead>
+                  <TableHead className="w-[70px]">Delay</TableHead>
+                  <TableHead className="w-[90px]">Tokens</TableHead>
+                  <TableHead className="w-[60px]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && records.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-12 text-center">
+                      <Loader2Icon className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ) : records.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
+
+                      No LLM call record yet
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  records.map((rec) => (
+                    <TableRow
+                      key={rec.id}
+                      className={cn("cursor-pointer", selected?.id === rec.id && "bg-accent hover:bg-accent")}
+                      onClick={() => setSelected(rec)}
+                    >
+                      <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtTime(rec.ts)}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {rec.task_id ? `#${rec.task_id}` : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {rec.worker || "-"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs">{rec.profile_name || "-"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs font-mono">{rec.model || "-"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={cn("text-xs", rec.latency_ms > 30000 && "text-amber-500")}>
+                          {fmtLatency(rec.latency_ms)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs">
+                          {fmtTokens(rec.input_tokens)} / {fmtTokens(rec.output_tokens)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {rec.status === "ok" ? (
+                          <Badge variant="secondary" className="text-xs text-emerald-600">
+                            OK
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">
+                            Error
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </RecordSurface>
+
+        {/* Inline detail panel */}
+        <Sheet open={selected !== null} onOpenChange={open => {if (!open) setSelected(null);}}>
+          <SheetContent className="workbench-detail-drawer flex w-full flex-col gap-0 p-0 sm:max-w-4xl">
+            <SheetHeader className="border-b px-5 py-4"><SheetTitle>Model call details</SheetTitle><SheetDescription>Request, response and token usage</SheetDescription></SheetHeader>
+            {detail?.workspace_cleaned_at&&<p className="border-b px-5 py-3 text-sm text-muted-foreground">The original request and response were {new Date(detail.workspace_cleaned_at).toLocaleString("en-US")}  Manual cleanup, call statistics retention.</p>}
+            {selected && <>
+
+            {/* Detail header */}
+            <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
+              <Badge variant="outline" className="text-xs font-mono">
+                #{selected.id}
+              </Badge>
+              <Badge variant="outline" className="text-xs font-mono">
+                {selected.profile_name || "-"}
+              </Badge>
+              <Badge variant="outline" className="text-xs font-mono">
+                {selected.model || "-"}
+              </Badge>
+              {selected.task_id && (
+                <Badge variant="outline" className="text-xs font-mono">
+
+                  Task #{selected.task_id}
+                </Badge>
+              )}
+              <span className="text-xs text-muted-foreground">{fmtTime(selected.ts)}</span>
+              <span className={cn("text-xs", selected.latency_ms > 30000 && "text-amber-500")}>
+                {fmtLatency(selected.latency_ms)}
+              </span>
+              {selected.status === "ok" ? (
+                <Badge variant="secondary" className="text-xs text-emerald-600">
+                  OK
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="text-xs">
+                  Error
+                </Badge>
+              )}
+              {/* Original text view switch. The old record does not have the original text. At this time, it is disabled rather than silently rolled back to avoid looking like
+                  「The original text is consistent with the analysis」。 */}
+              <Button
+                variant={showRaw ? "secondary" : "ghost"}
+                size="sm"
+                className="ml-auto h-7 shrink-0 text-xs"
+                disabled={!hasRaw}
+                title={hasRaw ? "View the original HTTP text actually sent and received by the provider" : "This record was recorded before this function was launched, and there is no original text."}
+                onClick={() => setRawView((v) => !v)}
+              >
+
+                Original text
+              </Button>
+              <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => setSelected(null)}>
+                <XIcon />
+              </Button>
+            </div>
+            {/* Request / Response split */}
+            <div className="trace-payload-grid grid min-h-0 flex-1 grid-cols-1 grid-rows-2 divide-y md:grid-cols-2 md:grid-rows-1 md:divide-x md:divide-y-0">
+              <div className="flex min-h-0 min-w-0 flex-col">
+                <div className="flex items-center gap-2 border-b py-0.5 pr-1.5 pl-3 text-[11px] font-medium text-muted-foreground">
+                  <span>Request{showRaw && " · Original text"}</span>
+                  <CopyButton text={reqText || ""} />
+                </div>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  {detailLoading ? (
+                    <div className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
+                      <Loader2Icon className="size-3.5 animate-spin" />
+
+                      Loading…
+                    </div>
+                  ) : (
+                    <pre className="p-3 font-mono text-xs break-all whitespace-pre-wrap">{reqText || "(empty)"}</pre>
+                  )}
+                </div>
+              </div>
+              <div className="flex min-h-0 min-w-0 flex-col">
+                <div className="flex items-center gap-2 border-b py-0.5 pr-1.5 pl-3 text-[11px] font-medium text-muted-foreground">
+                  <span>Response{showRaw && " · Original text (SSE)"}</span>
+                  <CopyButton text={respText || ""} />
+                </div>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  {detailLoading ? (
+                    <div className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
+                      <Loader2Icon className="size-3.5 animate-spin" />
+
+                      Loading…
+                    </div>
+                  ) : (
+                    <pre
+                      className={cn(
+                        "p-3 font-mono text-xs break-all whitespace-pre-wrap",
+                        selected.status !== "ok" && "text-red-600 dark:text-red-400",
+                      )}
+                    >
+                      {respText || "(empty)"}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
+            </>}
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete task &quot;{pickedTask}&quot; All LLM conversations?</AlertDialogTitle>
+            <AlertDialogDescription>
+
+              All LLM call records (including request/response original text) for this task will be permanently deleted, and this operation cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Confirm deletion"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@wakaru/cli-linux-x64": "1.15.0",
+    "js-beautify": "2.0.3",
+    "terser": "5.51.2",
+    "webcrack": "2.16.0"
+  },
+  "overrides": {
+    "editorconfig": "4.0.0",
+    "glob": "14.0.6",
+    "minimatch": "11.0.8"
+  }
+}

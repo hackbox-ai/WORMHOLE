@@ -1,0 +1,378 @@
+[
+  {
+    "id": "quickstart",
+    "title": "Quick Start",
+    "group": "Get started",
+    "paths": [],
+    "keywords": [
+      "First time",
+      "Getting Started"
+    ],
+    "content": "# Quick Start\n\n## Complete the first test\n\n1. Open LLM in the configuration, create a new model configuration, and fill in the protocol, model, Base URL and key.\n2. Test the connection, save and return to the list to activate the configuration.\n3. Fill in the test object, goals and necessary constraints in the task, or describe the requirements through dialogue.\n4. View the task dialogue and execution path in the task details, and add information as needed.\n5. Check the evidence in the vulnerability discovery and view the results in the task report.\n\nConfirm target range and identity used before beginning. The target sample can use its own deployed isolated test site.\n\n## How to describe the task\n\nClarify the entrance, scope, existing identity, focus direction and operational constraints. Don't ask for vulnerabilities to be reported in order to achieve volume.\n\n```text\nTest entrance:http://test.example.internal\nScope: Only this site and the same site APIs it calls.\nLogin: Use the logged-in test user environment in the Task Browser.\nObjective: Conduct verification based on the obtained interfaces, fingerprints and PoC clues, and record reproducible evidence.\nConstraints: Keep the test data and do not modify the data of other accounts; explain the steps that require manual operation first.\n```\n\n## Find function description\n\nThe Help button next to the page title opens a description of the current function. Instructions for use in the configuration popup can be read without closing the form. Instructions for use at the bottom left provide full table of contents and search.\n\n[Model Configuration](/help/?topic=llm) · [Dialogue and Tasks](/help/?topic=tasks) · [FAQ](/help/?topic=troubleshooting)"
+  },
+  {
+    "id": "extensions",
+    "title": "Optional extensions",
+    "group": "Configuration",
+    "paths": [
+      "/system/extensions"
+    ],
+    "keywords": [
+      "Optional",
+      "Installation",
+      "Data Packet",
+      "White box",
+      "REA"
+    ],
+    "content": "# Optional extensions\n\nThe WORMHOLE base platform can independently launch and perform common web security tests. The optional extension page displays whether components and data are available, and provides respective configuration entries.\n\n- ScopeSentry: Configure your own services and credentials on the asset synchronization page.\n- White box code analysis: configure independent service addresses and tokens, enable indexing and auditing on demand.\n- REA, native program, Android and protocol analysis: The administrator installs the corresponding tool chain and completes authorization on the MCP/Skill page.\n- PoC: Import your own knowledge sources, or add entries manually; the knowledge base does not automatically execute templates.\n- Fingerprint: The administrator installs the matching engine and the user imports the rules. Data can still be managed without an engine.\n\nNot installed, not configured, disabled, data empty and connection exception are different states. The absence of extension does not mean that the target is not vulnerable, nor does it require the entire task to be suspended. Installing the Skill will not install dependent services; installing services does not mean granting Agent permissions.\n\nPlease see the project warehouse`docs/extensions.md`for server deployment details."
+  },
+  {
+    "id": "llm",
+    "title": "Model configuration",
+    "group": "Configuration",
+    "paths": [
+      "/system/llm"
+    ],
+    "keywords": [
+      "LLM",
+      "Agent",
+      "thinking",
+      "Context",
+      "SSE"
+    ],
+    "content": "# Model configuration\n\n## Create new model configuration\n\n1. Select New on the LLM page and fill in the name, protocol, model and connection information.\n2. Fill in the Base URL and API Key as required by the supplier; refresh the button to try to obtain available models.\n3. Click Test Connection to check the address, protocol and key based on the actual returned results.\n4. Click New to save; return to the list to activate the configuration that needs to be used as the default value.\n\nThe model name should be consistent with the name actually provided by the server. A successful test connection indicates that the test request was successful. Complex tool calls and long contexts still need to be checked in conjunction with task performance.\n\nWhen editing a key, leave it blank to retain the existing key. Saving configuration and activating configuration are two operations. Changes to an activation configuration may affect subsequent requests to use it.\n\n## Proxy and session header\n\nThe request proxy only acts on model requests, leave it blank for direct connection, and supports HTTP, HTTPS, and SOCKS5. Special characters in proxy authentication should be URL encoded. The model agent, search agent, target exit and springboard channel are configured separately.\n\nCustomize the session header to fill in the request header name; the platform will use the current session ID as the value. Leave blank and do not send. It can be used for gateway caching or session routing. Do not fill in the key or full request header in the header name.\n\n## Speed limit and context\n\nThe rate limits per second and per minute are shared among Agents using this configuration, 0 means no limit.\n\nThe context window unit is K, which is one thousand tokens; 0 uses the default 200K and the maximum is 1000K. Should be set according to the true window of the model, false height will delay compression and cause context overruns.\n\nThe output upper limit is the token upper limit of a single response, 0 uses the server default. Output that is too small may truncate reasoning, answers, or tool parameters.\n\n## Streaming response and output fields\n\nStreaming response is enabled by default and is used to receive incremental content and running progress. After closing, send a non-streaming request and wait for the server to return a complete response. If the SSE of some gateways is incompatible, you can try to close it and re-verify the connection and tasks.\n\nThe OpenAI protocol can optionally output an upper limit field, set according to the max_tokens or max_completion_tokens actually supported by the interface. The Anthropic protocol uses max_tokens permanently.\n\n## Thinking and reasoning intensity\n\nThinking mode and reasoning strength are two independent parameters.\n\n- Do not send thinking mode: does not carry the thinking field, applicable to interfaces that do not support this field.\n- Off: Send disabled.\n- On: Send enabled.\n- Reasoning strength: Independently mapped to protocol supported reasoning_effort or output_config.effort.\n\nDifferent models have different parameter support ranges. When encountering parameter rejection, first set the unsupported fields to not be sent, and then test. Don't compensate for address or protocol errors by increasing the strength.\n\n## Priority and failover\n\nThe active configuration takes priority; the larger the numerical priority of the standby configuration, the higher it is, and the same priority will rotate. Whether the actual switchover occurs is also subject to rules such as the explicitly specified configuration of the failover switch, Agent or task.\n\nConfigurations that do not participate in polling can still be explicitly specified by Agents or tasks, but will not enter the automatic standby chain. Suitable for configurations that require separate allocation.\n\n[Full retry and failover instructions](/help/?topic=llm-retry)"
+  },
+  {
+    "id": "llm-retry",
+    "title": "Retry and failover",
+    "group": "Configuration",
+    "paths": [],
+    "keywords": [
+      "SDK",
+      "429",
+      "Empty response",
+      "Meltdown",
+      "Back off"
+    ],
+    "content": "# Retry and failover\n\n## Configuration range\n\nThe LLM page's retry and backoff settings manage global defaults. A single model can cover three layers: connection establishment, empty response and streaming security window; circuit breakers and intent reruns are set globally.\n\nLeave the number blank or fill in 0 to use the default value; fill in -1 to close the corresponding layer, and use the specified number for positive numbers. Leave the interval blank or fill it with 0 to use the default policy, and a positive number to use a fixed millisecond interval. Different layers may be superimposed, and higher times will increase waiting and model consumption.\n\n## Retry establishing connection\n\nHandle connection resets, network timeouts, DNS failures, and HTTP 408, 429, 500, 502, 503, 504 before the response is established and resend the request unchanged. The default number is 3, initial 0.5 seconds, exponential backoff, upper limit 8 seconds.\n\nDeterministic errors such as 400, 401, 403, 404, 413, 422 etc. should check parameters, authentication, model and context. Exceptions after the response flow has started are handled by other layers.\n\n## Empty response retry\n\nOnly for OpenAI protocol: HTTP 200 and normal stop, but retry when the entire response has no content block. The default number is 2, initial 0.5 seconds, exponential backoff, upper limit 8 seconds.\n\nThe output upper limit should be adjusted when there is no content due to output upper limit truncation. Empty response retry will resend the entire context a controlled number of times.\n\n## Streaming security window\n\nConnection dropped, overloaded, or in-stream 429, 5xx retry on the same configuration when the stream has been established but no output has yet been delivered to the caller. The default number is 2, initial 0.5 seconds, exponential backoff, upper limit 4 seconds.\n\nInsufficient credits, too long contexts, and deterministic parameters or authentication errors are not handled by this layer. You cannot use this layer to directly replay output after it has been delivered to avoid repeated output or execution.\n\n## Fusing and cooling\n\nAfter the instantaneous failure accumulation reaches the threshold, it enters cooling; if it succeeds, the accumulation will be cleared. Deterministic errors such as authentication, quota, and model non-existence can directly trigger the circuit breaker. The cooling configuration is skipped during polling, and the cooling and failure status can be viewed on the page.\n\nDefault instantaneous failure threshold is 3, with cooldown in increments of 1, 5, and 30 minutes. Fill in -1 to turn off the instantaneous failure threshold circuit breaker, and deterministic failure may still cause circuit breaker failure.\n\n## Intention to rerun\n\nWhen the Worker ends due to a model error and the inner layer retry does not recover, the intent can be re-executed. The default number of reruns is 2, with an interval of 3 seconds. Fill in -1 to close.\n\nPause, terminate, and task completion interrupt this type of waiting. Intention to rerun will re-enter the internal retry process, and the number of each level should not be set to high at the same time.\n\n## Automatic failover\n\nWhether the Agent of the unspecified model switches from the active configuration to the standby chain is controlled by the polling switch. Explicitly specifying whether the configuration allows rollback is controlled by an independent switch; the specified relationship is retained when turned off by default.\n\nTask explicit configuration chains are used in the selected order and have their own quota switching conditions. Do not understand global polling, retry and task configuration chain as the same switch. Configurations whose context window is not large enough to accommodate the current request will be skipped. Actual order, cooling and errors are subject to page status and Trace."
+  },
+  {
+    "id": "agents",
+    "title": "Agent",
+    "group": "Configuration",
+    "paths": [
+      "/system/agents"
+    ],
+    "keywords": [
+      "Prompt word",
+      "Trigger",
+      "Worker"
+    ],
+    "content": "# Agent\n\n## Create a new custom Agent\n\nSelect New on the Agent page, fill in the Key, name and description, and then configure the default model, running restrictions, prompt words, closing, MCP, Skill, tools and triggering strategies in the same editor.\n\nThe settings during the creation process are saved in a local draft. Click \"Create Agent\" to save them once. Closing or canceling a draft does not leave an empty Agent. Triggers can be added to the to-be-created list first and then created with the entire Agent. If the creation fails, the filled-in content will be retained and you can correct the errors and try again.\n\nKey is fixed after creation; prompt word history starts recording after successful creation.\n\n## Edit role\n\nOpen the role in the Agent list, modify the prompt words, running restrictions and ability bindings and save. Task orchestration uses roles such as main Agent, Planner, and Worker to divide labor; other Agents can also be selected for independent conversations.\n\nModel selection and tool authorization should be configured by role usage. The default model can follow the task and global configuration, and the specified model configuration is used when explicitly bound. The interactive shell switch is used to grant persistent terminal capabilities. The specific time when the modification takes effect depends on the new session or the next run, and requests that have already been started will not be retroactively modified.\n\n## Capability authorization\n\nMCP, Skills, and Built-in Tools each control a character's visible abilities. Whether a tool can execute is also subject to interception rules, approvals, and task scope. After adding an MCP or Skill, check the character binding. Do not judge that it is callable just because it exists in the library.\n\n## Running restrictions and closing\n\nThe single Agent run limit is different from the entire task deadline. Use a single ending prompt when the number of runs or time is exhausted; use a task ending prompt when the entire task is about to time out.\n\nClosing is used to write back existing information, findings, and conclusions. Leave blank to use the built-in default. When modifying the custom prompt words, keep the evidence storage and task report requirements to avoid only outputting the summary without saving the results.\n\n## Delete custom Agent\n\nCustom Agents can be deleted from the right side of the list or from the bottom of the edit panel. After confirmation, prompt words, triggers, scheduling status and capability bindings will be removed, and historical conversations will be retained. If deletion fails, an error will be displayed in the confirmation box and you can try again.\n\nThe system's built-in orchestration roles are retained and do not provide deletion operations.\n\n## Automatic trigger\n\nCustom Agent's trigger creates a new session to run when the condition is hit. The system comes with triggering reasons and related task, discovery or target information. When troubleshooting unexpected new sessions, you should check both triggers and execution records."
+  },
+  {
+    "id": "mcp",
+    "title": "MCP",
+    "group": "Configuration",
+    "paths": [
+      "/system/mcp"
+    ],
+    "keywords": [
+      "Tool Authorization",
+      "Connection Service"
+    ],
+    "content": "# MCP\n\n## Connection service\n\nCreate a new connection in MCP, fill in the connection method, address and authentication information supported by the service, and refresh the tool list after saving. After the connection configuration is successful, the required Agent needs to be authorized.\n\nWhen no tool is found, check service reachability, authentication and tool return first, and then refresh. The connection and tool status displayed on the page can better indicate whether the access is completed than simply saving successfully.\n\n## Authorization and calling\n\nAgent can only use services and tools visible to it. A Skill can also be associated with an MCP, which exposes related capabilities when the Skill is loaded. The call still goes through the platform execution and interception link.\n\n## Modify and delete\n\nRecheck the tool list after modifying the connection. Deleting a service will remove the connection and related Agent authorization; confirm whether the role is still used before executing."
+  },
+  {
+    "id": "skills",
+    "title": "Skill",
+    "group": "Configuration",
+    "paths": [
+      "/system/skills"
+    ],
+    "keywords": [
+      "Skill",
+      "Compressed package"
+    ],
+    "content": "# Skill\n\n## New and Import\n\nYou can create or upload a skill compressed package on the Skill page. The name uses lowercase letters, numbers, and hyphens and is 1–64 characters long. The text should describe applicable conditions, operating procedures, output requirements and limitations.\n\n## Linked with Agent and MCP\n\nConfigure visible Agents so that roles can discover and load Skills. When an MCP is associated, the corresponding tools are disclosed when loading skills. The skill definition method and process, the actual tool invocation is still executed by the Agent.\n\nThe missing skills list displays skills that the Agent has named but do not exist in the current library, which can be used to complete methods or correct names. Do not treat roll call records as running successfully.\n\n## Verify\n\nIn an isolated task, have the authorized role handle scenarios appropriate for the skill, checking that the session loads the skill, that the tools are available, and that the results are written back. Merely successfully importing files does not prove that the workflow has been completed."
+  },
+  {
+    "id": "tools",
+    "title": "Tool",
+    "group": "Configuration",
+    "paths": [
+      "/system/tools",
+      "/function/commands"
+    ],
+    "keywords": [
+      "shell",
+      "Script",
+      "Command"
+    ],
+    "content": "# Tool\n\n## Add tool\n\nTool configuration management description, parameter default values and Agent binding. Type command, script, or HTTP execution when creating; the shell type declares capabilities available through Bash.\n\nNames and descriptions will be provided to the model, and inputs, outputs, and uses should be clear to avoid writing environment-specific paths as general capabilities.\n\n## Execution and recording\n\nThe tool page is used to view execution parameters and results. Whether the call is allowed is determined by role authorization, interception policy, and approval. Saving the tool does not mean that its dependencies have been installed. You should use the isolation scenario to check the execution environment.\n\n## Troubleshooting failed\n\nFirst look at the parameters, exit status and output of the specific call, and then check the running directory, Python interpreter, external service or network channel. The success described by the model is not a substitute for actual tool results."
+  },
+  {
+    "id": "tasks",
+    "title": "Dialogue and Quests",
+    "group": "Tasks and results",
+    "paths": [
+      "/chat",
+      "/function/tasks"
+    ],
+    "keywords": [
+      "Batch",
+      "Concurrency",
+      "Timeout",
+      "Template",
+      "Pause",
+      "Stop"
+    ],
+    "content": "# Dialogue and Quests\n\n## Initiate task\n\nCreate a new task on the task page and fill in the goal, description and test scope; you can also describe the requirements to Auto in the conversation, and it will dispatch the task based on the context. Run records of independent conversations and formal tasks should be viewed as per the actual session to which they belong.\n\nProvide access, identities, and restrictions to clarify which targets allow testing. Saving a template allows you to reuse descriptions, goals, categories, and task-level rules; applying a template is a copy and will not be continuously synchronized with the template.\n\n## Batch tasks\n\nBulk portals identify targets one domain name, IP, or URL per line, up to a maximum of 500. Each target saves tasks, findings, links and reports independently.\n\nOrdinary tasks and infiltration dialogues in execution share the global quota, and a maximum of 3 tasks can be run at the same time. After completion, the tasks will be filled in the queue. Batch tasks do not require a fixed number of vulnerabilities. They should continue to cover executable directions and end when there are no executable directions or the deadline is reached.\n\nThe timeout is timed from the actual start, and the queue is not timed. The task time limit of each target and the running limit of a single Worker take effect separately.\n\n## Execution process\n\nAfter the task is started, you can view the main Agent, Planner, Worker and system events in the task dialog, and view the exploration relationship in the execution path. Business modeling is performed in the background, and the modeling status and test progress can be viewed separately.\n\nThe main Agent receives user supplements, the Planner organizes the exploration direction, and the Worker performs verification and evidence recording. Whether the newly added information forms a follow-up task shall be subject to actual planning, tools and write-back records.\n\n## Advanced parameters\n\nEach line of the target system entry contains one item for browser and background modeling; if left blank, identify it from the task target and description.\n\nDirect execution will hand the description and goal to the Worker as the first intent, and then the Planner will take over. When closed, plan first and then execute.\n\nThe planning interval is used to wake up planning when there is no trigger for a long time, with a lower limit of 10 minutes. Coverage switches determine the use of scope tools, progress, and coverage statistics.\n\nRelated tasks provide a read-only context for the directly related task. The task itself continues to be written to the independent blackboard, and the association should not be understood as copying or continuing to run the old task.\n\n## Pause, stop and timeout\n\nPause is used to temporarily stop scheduling and execution, and can be resumed later. Stopping cancels running workers and browser operations and saves existing findings and reports.\n\nWhen the task is close to the deadline, it should be concluded and the results should be saved based on existing evidence. Timeout does not mean that no discovery has been made. Check existing vulnerabilities, execution records and reports after the end.\n\nModifying the target may trigger re-planning or restoration of the final task; the page will retain corresponding operation prompts.\n\n## Classification and archiving\n\nClassification is used for filtering and sorting and does not affect Agent execution. Archiving compresses execution-related data to cold storage, which can be restored from archived pages. Archiving, deletion and file cleaning have different impacts. Check the range in the confirmation box before execution."
+  },
+  {
+    "id": "modeling",
+    "title": "Business Modeling",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/business-models"
+    ],
+    "keywords": [
+      "Backstage",
+      "System entrance",
+      "Draft"
+    ],
+    "content": "# Business Modeling\n\n## Initiate and view\n\nBusiness modeling can be initiated independently, or the test task can provide the target system entry. Select to view runs, drafts and historical deliveries by system; existing results can be used for incremental verification.\n\nBusiness modeling is presented in an independent module, and test tasks are displayed in a common task list. The test task continues to execute while the modeling background is updated.\n\n## Identity and Delivery\n\nIdentity tags are used to distinguish models and usage scenarios. They should use identifiable names and do not fill in cookies, tokens or passwords.\n\nDraft, running process and delivered version are different states. Which model information is used for test tasks should be judged based on published content and task records.\n\n## Failure handling\n\nCheck modeling sessions for specific errors and target reachability. When part of the model is unavailable, you can retry it individually, and existing deliveries can still be viewed; do not judge the entire test task as a failure just based on the modeling time."
+  },
+  {
+    "id": "browser",
+    "title": "Task Browser",
+    "group": "Tasks and results",
+    "paths": [],
+    "keywords": [
+      "Login",
+      "Cookie",
+      "Session",
+      "Account",
+      "Human-machine takeover"
+    ],
+    "content": "# Task Browser\n\n## Open the browser environment\n\nSelect the task browser in the task details, create or select a browser environment, enter the target address and browse. Users can log in manually, and the Agent can also operate the corresponding environment according to task needs.\n\nThe browser environment is named according to its purpose, such as ordinary user, administrator, tenant one or non-login environment; it is not limited to two fixed accounts.\n\n## Multiple identity test\n\nUse independent environments for different identities to avoid mixed use of cookies caused by repeated logins in the same environment. Label each environment with its site, identity, and purpose, and tell the Agent which environment should be used.\n\nCheck that the page is in the expected identity after logging in. The reuse of Cookie or Session does not mean that all tools automatically have the same request headers, browser storage and network conditions, and should be checked against the actual request.\n\n## Manual takeover and sharing\n\nWhen Agent requires login or manual operation, it can enter the browser to take over. When the task is suspended, the Agent stops operating, but the user can still continue to log in and browse. After completion, it is up to the user to resume the task.\n\nBy default, identity reuse within the same task is used as the boundary. Cross-task sharing should explicitly select and verify sites, applications, and accounts to avoid mixing credentials from different customers or tenants.\n\n## Network and Traffic\n\nBrowsers in springboard tasks need to use task binding channels. Whether traffic enters the recording link depends on the capture switch, actual browser configuration and traffic page results. The appearance of the browser screen does not mean that all requests have been entered into the database."
+  },
+  {
+    "id": "findings",
+    "title": "Discovery, path and retest",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/findings"
+    ],
+    "keywords": [
+      "Finding",
+      "Report",
+      "link",
+      "Evidence"
+    ],
+    "content": "# Discovery, path and retest\n\n## View vulnerabilities\n\nThe discovery list saves the vulnerabilities and status that have been stored in the database. Open the details to check the scope of impact, reproduction steps, requests and responses, evidence, and verification conclusions. Candidate PoCs, fingerprint hits, and code clues all require further verification.\n\n## Execution path\n\nThe overall task diagram shows the overall exploration relationship, and the link diagram of the vulnerability details shows the causal path related to the current discovery.\n\nThe vulnerability discovery card is marked in red, and the relevant path connections are marked in red and bold; the card in the middle maintains its original style. The node index can be searched and positioned, click on the node to view details, scroll and pan, and adjust the field of view using the full image or reading scale.\n\nWhen there are no associated nodes or causal edges found in history, the path cannot be restored out of thin air. You should check the existing evidence and execution records.\n\n## Traffic evidence\n\nRequests and responses can be bound as normal comparison, vulnerability proof or supplementary verification, and instructions and sequences can be set. The evidence is a saved copy; the bound evidence remains after the original traffic is cleaned.\n\nWhether the inspection report needs to be updated after the evidence is changed. Don't rely on a response status code alone to determine impact.\n\n## Retest and continue verification\n\nThe retest reads the original evidence and constraints in an independent session, and records the conclusion and evidence. When completed successfully and the fix is ​​confirmed, the vulnerability status changes to Fixed; other results remain in their original status.\n\nContinuing verification will create a high-priority exploration intent in the original task and inherit related asset anchors. Review tasks, scope and additional constraints before execution.\n\n## Reporting and exporting\n\nThe task report is based on existing findings and evidence. After completion, check whether the content is complete. Discovery pages can be exported by range and format; the export range is subject to the current selection."
+  },
+  {
+    "id": "assets",
+    "title": "Assets and Scope",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/assets",
+      "/function/sync"
+    ],
+    "keywords": [
+      "Enterprise",
+      "ICP",
+      "CIDR",
+      "Import"
+    ],
+    "content": "# Assets and Scope\n\n## Add assets\n\nThe asset module manages enterprise, domain name, IP, URL and other information. The task asset list manages the test assets and scope relationships of the current task. When adding a range, you can enter domain name, IP, CIDR, ICP or keywords one line per line.\n\nDomain names and IPs can create or reuse global assets; CIDR, ICP, and keywords can also serve as scope context for Agents.\n\n## Enterprise ownership\n\nICP in the enterprise scope is used for exact matching. Enterprise keywords are provided to the Agent as clues and all matching text will not be automatically attributed as enterprise assets.\n\nWhen creating a task, associate an enterprise to add the currently existing assets of the selected enterprise to the task test assets and provide scope context. It does not automatically generate all test intents, nor should it replace task objectives.\n\nEditing an enterprise scope replaces the existing scope, appending retains the old scope. Relevant confirmation prompts remain on the operation page.\n\n## Associated tasks and coverage\n\nPersistent blackboards, scopes, and related traffic directly associated with tasks can be used as read-only sources of information, and new tasks are written to independent contexts. The coverage view displays the scope and relationship, and the coverage ratio should be judged based on the actual test evidence of the task.\n\n## External synchronization\n\nAsset synchronization relies on the corresponding data source and MCP connection. After creating the data source, you need to fill in the address, key and enable it; check whether it is completed with the connection status and actual synchronization results."
+  },
+  {
+    "id": "traffic",
+    "title": "Traffic and Evidence",
+    "group": "Tasks and results",
+    "paths": [
+      "/function/traffic"
+    ],
+    "keywords": [
+      "MITM",
+      "Request",
+      "Response",
+      "Binding"
+    ],
+    "content": "# Traffic and Evidence\n\n## Enable capture\n\nThe traffic capture switch in the system configuration controls logging capabilities. When enabled, it provides the agent with recording agent and traffic query capabilities; when disabled, the corresponding recording is stopped, and the springboard task retains its bound channel.\n\nThe capture range is based on the actual recorded link request. Standalone tools, processes that do not use a proxy, or protocols that are not proxy-compatible may not be documented.\n\n## Query request and response\n\nFilter by task, host and other conditions on the traffic page to view the request header, body, response and status. When there is no record, first confirm that the task has indeed sent a packet, and then check the capture switch, proxy usage, filter conditions and network channels.\n\n## Associated vulnerability evidence\n\nAfter selecting the request and response, bind it to an existing vulnerability, explain how it supports the conclusion, and distinguish between normal controls, vulnerability proof, and supplementary verification. The order can be adjusted after binding.\n\nAutomatic association is controlled by configuration and may increase model consumption; findings can still be reported when there is no matching traffic. Turning off automatic correlation does not affect manual binding and saved evidence."
+  },
+  {
+    "id": "fingerprints",
+    "title": "Fingerprint management",
+    "group": "Configuration",
+    "paths": [
+      "/system/fingerprints"
+    ],
+    "keywords": [
+      "Product Identification",
+      "Rules"
+    ],
+    "content": "# Fingerprint management\n\n## Management Rules\n\nFingerprint libraries are used to identify products and technologies. Search rules by source, product or keyword, view matching conditions and status, and add or maintain rules through the entrance provided on the page.\n\nResponse sample verification is used to check rule matching and does not replace real target testing.\n\n## Task linkage\n\nAfter the task obtains the entry response, page or related materials, the recognition results can supplement the product information for planning and PoC association. Obtaining the material first and then identifying it cannot guarantee a hit without a response.\n\nCheck the evidence, rule source, and identification status when viewing asset fingerprints. Lack of icons and other materials, pending processing or recognition failure should be judged according to the page status.\n\n## Judgment boundary\n\nFingerprint hits indicate product clues, but do not mean that the vulnerability is established; misses do not mean that the target does not have related products. After automatic recognition is turned off, historical data can still be viewed.\n\n[How to use identification results in PoC](/help/?topic=pocs)"
+  },
+  {
+    "id": "pocs",
+    "title": "PoC Knowledge Base",
+    "group": "Configuration",
+    "paths": [
+      "/system/pocs"
+    ],
+    "keywords": [
+      "Fingerprint correlation",
+      "Candidate",
+      "Vulnerability Template"
+    ],
+    "content": "# PoC Knowledge Base\n\n## Search and add\n\nUnify the PoC library to search by product, vulnerability information and template content, view details and matching conditions, and maintain content using the import or new capabilities provided on the page.\n\nProduct aliases are used to associate different names to the same product. When adjusting applicable conditions, fill in the form according to the real version and evidence; leave it blank and let it be judged based on the task and conditions. The rule changes take effect on subsequent selections of new tasks.\n\n## Linked with fingerprint and arrangement\n\nFingerprints and asset information are used to associate candidate PoCs. Candidate materials are used for Planner to select directions and Workers to verify based on actual conditions. Adoption records are used to track usage and cannot be directly regarded as evidence of vulnerabilities.\n\nExecution depends on scope, version, available tools, operational constraints, and planning. Importing more PoCs does not mean that each task will execute the entire library one by one.\n\n## Verification results\n\nReported vulnerabilities should include real requests, responses, recurrence conditions, and impact evidence. Template descriptions, product hits, and version guesses should be retained as leads and not directly converted to verified findings."
+  },
+  {
+    "id": "reverse",
+    "title": "Reverse and code analysis",
+    "group": "Configuration",
+    "paths": [
+      "/system/reverse"
+    ],
+    "keywords": [
+      "JS",
+      "White box",
+      "Source code"
+    ],
+    "content": "# Reverse and code analysis\n\n## Configure analysis capabilities\n\nConfigure capabilities such as session limit, source code indexing and automatic discovery on the reverse engineering and code analysis page. The source code index is used for static auditing, and automatic identification can generate candidate clues for the source code or installation package obtained in the task.\n\nAnalysis session cap limits concurrently resident sessions. Whether the external analysis service is available should be confirmed by combining the connection results and call records.\n\n## How to use Worker\n\nWorker calls relevant tools or skills as needed based on the obtained JS, source code, installation package or protocol materials. Automatically triggering shutdown can still be explicitly initiated by the Worker in applicable scenarios.\n\nWhite box capabilities are accessed through the service API. The reachability, authentication, input materials and return results of the service need to be checked; configuring the client cannot replace the deployment service.\n\n## From clues to evidence\n\nStaticly discovered interfaces, key candidates, calling relationships or risk points need to be verified based on the authorization scope. For encrypted interfaces, check whether the reverse proxy and traffic records are connected in series, and retain evidence of the actual call."
+  },
+  {
+    "id": "network",
+    "title": "Springboard Channel",
+    "group": "Configuration",
+    "paths": [],
+    "keywords": [
+      "Connector",
+      "Multiple hops",
+      "Onsite",
+      "Agent"
+    ],
+    "content": "# Springboard Channel\n\n## Select network mode\n\nRegular mode uses the server to reach the network and regular exits. The springboard mode provides a path forwarded through the connector for targets that cannot be directly accessed by the server. Tasks need to be bound to specific channels.\n\nTarget traffic uses task channels; models and searches use separate exits. Existing tasks will retain their original channels, and new settings will not automatically change the binding of historical tasks.\n\n## Configuration and deployment\n\n1. Create a channel in the system configuration and fill in the connection and routing information according to the actual network.\n2. Download the connection package corresponding to the channel, deploy the connector on the selected transit machine and start it.\n3. Check the connector online status, channel connectivity, and target service reachability.\n4. When creating a new task, select the springboard mode and the channel, and then start testing.\n\nAuthentication information in connection packages is managed by deployment credentials. When network capabilities such as TCP, UDP, and ICMP are required, use administrator privileges as required by the connector.\n\n## Multi-hop example\n\n```text\nWORMHOLE server → first transit → second transit → target service\n```\n\nEach hop needs to meet the connection requirements of adjacent nodes and the target route. During verification, limit the direct path from the server to the target, and then check whether the browser, HTTP, command tools, etc. use the specified channel; simply showing that the channel is online cannot prove that all target services are reachable.\n\n## Connectivity check\n\nCheck connectors, hops, and target services by channel configuration or test entry. Only fill in the actual destination address and port when you need to verify a specific service to avoid confusing online status with service reachability.\n\nChecking from adjacent hops on connection failure: listening, authentication, firewall, routing, destination port and permissions. After modifying the channel, recheck the connection package and the running connector configuration.\n\n## Docker deployment\n\nThe connector establishes authenticated CONNECT forwarding through the WORMHOLE application HTTP portal, with internal control and SOCKS ports remaining within the application container. The server address and entry port filled in on the page must be accessible from the relay; Compose uses WORMHOLE_PORT to synchronize the connection packet entry port generated. When the reverse proxy uses a different external port, set WORMHOLE_PUBLIC_PORT and verify that the proxy supports the required CONNECT forwarding.\n\nSpringboard commands and browsers use Linux namespace, and enable compose.network.yaml to provide corresponding capabilities. The capability support of Docker Desktop and native Linux should be verified separately.\n\nFull network mode for Linux relay requires root, available TUN, iproute2, iptables, and ip6tables. When the connector exits, it restores its forwarding status and firewall resources; the normal proxy mode and the complete network mode are configured separately."
+  },
+  {
+    "id": "notifications",
+    "title": "Notice",
+    "group": "Configuration",
+    "paths": [
+      "/system/notify"
+    ],
+    "keywords": [
+      "Mail",
+      "SMTP",
+      "High risk",
+      "Ringtone",
+      "Webhook"
+    ],
+    "content": "# Notice\n\n## Page reminder\n\nWhen a new vulnerability is discovered and stored in the database, a reminder can be displayed on the page, and a ringtone can be played according to the browser settings. The reminder in the lower right corner is related to the current browser preference; the first playback may be restricted by the browser sound policy.\n\n## Configure external channels\n\nCreate a channel in the notification, fill in the address and credentials of the corresponding service, set the activation status, push scope and real-time or summary mode, and save it after the test is successful.\n\nThe external notification master switch, channel switch and filter conditions jointly determine whether to send. Existing channel types cannot be modified. If you need to use other types, create a new channel.\n\n## Range and current limit\n\nFilter by level, type, task, and asset. Type keywords, one per line, use case-insensitive substring matching; exclusion conditions take precedence over inclusion. Leave tasks and assets blank to indicate no limit.\n\nLeave the current limit blank to use the channel default value, 0 means no current limit. Messages that exceed the limit will be sent later. The summary interval is set in minutes and only takes effect in summary mode.\n\n## High-risk emails\n\nFill in the SMTP, sender and recipient email addresses in the system configuration, and check the external notification master switch. High-risk and serious vulnerabilities will be pushed when they are added to the database or upgraded, and the same vulnerability will be processed according to the deduplication rules.\n\nThe details link uses the configured site address. Test emails are used to verify delivery links, and actual discovery notifications are also controlled by events, levels, and deduplication conditions. View delivery records and service returns when troubleshooting."
+  },
+  {
+    "id": "intercept",
+    "title": "Interception and Approval",
+    "group": "Configuration",
+    "paths": [
+      "/system/intercept"
+    ],
+    "keywords": [
+      "ALLOW",
+      "ASK",
+      "DENY",
+      "Rules"
+    ],
+    "content": "# Interception and Approval\n\n## Tool rules\n\nTool rules are matched from high to low priority, and the first hit takes effect. Actions include allow, manual approval, and deny. Only tools with interception enabled enter the corresponding rule chain, and the specific policy is subject to the current configuration.\n\nRules, model review, and default policies each affect the final result. Don’t assume that users will be asked for every execution just because the platform supports approval.\n\n## Model review and manual approval\n\nThe model review combines the prompt words and available context to give a judgment; it is configured to be transferred to manual time and is pending approval. The approval page is used to view request, basis and execution information.\n\nHistorical snapshots may be limited or truncated, and the page displays these states. Unsaved context cannot be extrapolated from the current data to the complete record at that time.\n\n## Asset Rules\n\nCongruent or fuzzy matching of domain name, IP, URL, and CIDR can be used. The actual interception range is subject to the currently enabled rules.\n\nTask level rules are not written globally. Match prohibition rules (including global) first; when prohibition is not hit and there is a task permission rule, the permission rule must be hit before testing. This whitelist is not enabled when task permission rules are not configured.\n\n## Regularity and verification\n\nSome server-side regular extensions cannot be previewed in the browser and should be processed according to the server-side verification results. After modifying the rules, use the isolation scenario to confirm the hit, approval or rejection results, instead of directly replacing the verification with the regular save success."
+  },
+  {
+    "id": "settings",
+    "title": "System configuration",
+    "group": "Maintenance",
+    "paths": [
+      "/system/settings"
+    ],
+    "keywords": [
+      "Operating Budget",
+      "Search",
+      "Python",
+      "Update"
+    ],
+    "content": "# System configuration\n\n## Operation and task budget\n\nContext compression is used to organize long conversations, and the compression records are saved in the task working directory. The default compression method is used when experimental compression is turned off.\n\nThe number of Workers affects the execution concurrency of new tasks. Planning constraints and execution constraints are handed over to Planner and Worker respectively, and take effect according to subsequent operations or planning.\n\nFill in the upper limit of the task budget with 0 to indicate no additional restrictions; after reaching the budget, it will be paused and the evidence will be retained, and you will continue to obtain a new round of quota manually. Task deadlines and Agent running limits are still valid independently.\n\nProgress judgment is based on new evidence and coverage, and does not use the number of vulnerabilities as the only criterion. It takes about 30 seconds for the running task to read the new budget value, and the paused task will not be automatically resumed.\n\nThe batch default timeout starts from the actual start time and can be adjusted when creating the batch; queue waiting is not included in the task duration.\n\n## Traffic and proxy\n\nTraffic capture, automatic correlation evidence, regular exit, model agent and search agent are configured separately. The springboard channel only takes over the corresponding target traffic.\n\n[Traffic Description](/help/?topic=traffic) · [Springboard Channel](/help/?topic=network)\n\n## Search\n\nAfter enabling network search, authorize the corresponding capabilities in the Agent. Configure the necessary keys and search proxies by source, and use the Test button to check the currently entered source, authentication, and proxy.\n\nDeepSeek search requires the current LLM to use the official model and Anthropic protocol that supports this capability, and use the LLM agent, which may incur model calling fees. Other sources are accessed per search agent configuration.\n\n## Local preferences and interpreters\n\nThe message sending method is only saved in the current browser. The Python interpreter is used for scripting tools. Leave it blank to automatically detect it, or you can specify it explicitly and detect it.\n\n## Update and rollback\n\nUpdates and rollbacks will restart the service and may interrupt running tasks. Please check the page to confirm before operating. Application updates in container mode do not include the container tool chain, and changes in the tool chain require an image update."
+  },
+  {
+    "id": "workspace",
+    "title": "Workspace",
+    "group": "Maintenance",
+    "paths": [
+      "/function/workspace"
+    ],
+    "keywords": [
+      "Occupied",
+      "Cleanup",
+      "Product",
+      "File"
+    ],
+    "content": "# Workspace\n\n## View task products\n\nThe workspace is used to view task files, command output, and intermediate products. View occupancy and classification by task, preview or download if necessary.\n\nOccupancy statistics are used to determine which tasks need to be organized. The file directory is not equivalent to the vulnerability evidence library. When cleaning, upload attachments, intermediate files and registered evidence need to be distinguished.\n\n## Manual cleanup\n\nAfter selecting the task and cleanup scope, check the preview and confirmation information. When cleaning ordinary files, the attachments and evidence identified by the system are retained; unregistered files still require manual judgment. It cannot be restored after deletion.\n\n## Archive and delete\n\nTask archiving compresses relevant records and products into cold storage and supports restoration. Workspace cleanup only processes selected file ranges. Task deletion can further affect associated data, and options must be checked by pressing the confirmation box.\n\nWhen the file cannot be opened, you can download it and use a suitable program to view it. The file should not be judged to be damaged based solely on failed preview."
+  },
+  {
+    "id": "trace",
+    "title": "Trace and Log",
+    "group": "Maintenance",
+    "paths": [
+      "/function/llm-records",
+      "/system/logs"
+    ],
+    "keywords": [
+      "Token",
+      "Original text",
+      "Troubleshooting"
+    ],
+    "content": "# Trace and Log\n\n## View model calls\n\nLarge model Trace is used to view calls, tokens, errors, and the original text of requests and responses recorded according to configuration. Whether the original text is visible depends on the recording switch and whether historical data is saved.\n\nPage statistics and specific calls are checked against each other. The text description generated by the model cannot replace the usage or tool output returned by the server.\n\n## Troubleshoot model errors\n\nFirst record the task, session, model configuration and occurrence time, and check the HTTP status and error content. Authentication, quota, model name, parameters, context and network errors are handled separately.\n\nCheck the retry, cooling and configuration switching records again. Multiple layers of retries may extend the wait, but will not fix wrong keys or non-existent models.\n\n## Log and delete\n\nLogs are used to supplement scheduling, service, and tool errors. Prioritize using time and task identification positioning. The original request text may contain test credentials, check the content before sharing.\n\nDeleting the call history will permanently remove the selected records and saved original texts, and is performed according to the page confirmation range."
+  },
+  {
+    "id": "dashboard",
+    "title": "Dashboard",
+    "group": "Get started",
+    "paths": [
+      "/dashboard"
+    ],
+    "keywords": [
+      "Token",
+      "Cache",
+      "Statistics"
+    ],
+    "content": "# Dashboard\n\n## View overall status\n\nThe dashboard summarizes task progress, vulnerability discovery and execution consumption. First select the required time range, model or task caliber, and then interpret the statistics.\n\n## Token usage\n\nThe statistical scope of task summary, call-by-call and task and conversation summary are different. Uncached input, cache hits, and outputs are displayed separately; the cache hit rate is calculated according to the corresponding caliber.\n\nWhen checking the usage, enter the call one after another to confirm the time, configuration and session ownership. When the task does not call the model, the request fails and no usage is returned, or the record has not been written, the token cannot be inferred from the number of tasks.\n\n## View details\n\nGo from a task or discovery to actual details, checking evidence and execution status. Summary graphs are used to locate changes. The specific reasons need to be combined with tasks, traces and logs."
+  },
+  {
+    "id": "account",
+    "title": "Accounts and Appearance",
+    "group": "Maintenance",
+    "paths": [
+      "/system/account",
+      "/system/appearance"
+    ],
+    "keywords": [
+      "Username",
+      "Password",
+      "Topic"
+    ],
+    "content": "# Accounts and Appearance\n\n## Modify username\n\nModify the administrator username in the account and enter the current password as prompted to confirm. After saving, log in with the new username and keep the password unchanged. Don't confuse the page display name with your actual login name.\n\n## Change password and exit\n\nChanging the password requires verification of the current password. Exit ends the current browser login. When using a shared computer, check that the browser has saved the test credentials after exiting.\n\n## Appearance and Preferences\n\nThe appearance page sets the theme and layout, and the relevant preferences are saved in the current browser. It may be restored to default after changing browsers or clearing site data. Instructions for use support light and dark themes and narrow screen reading."
+  },
+  {
+    "id": "troubleshooting",
+    "title": "FAQ",
+    "group": "Maintenance",
+    "paths": [],
+    "keywords": [
+      "No feedback",
+      "No traffic",
+      "Connection failed",
+      "Empty report"
+    ],
+    "content": "# FAQ\n\n## No feedback after task startup\n\nCheck whether the task is queued, paused, or awaiting approval, and then view the task dialogue, real-time updates, and Trace. Business modeling runs in the background and its status should be viewed separately. Record the specific tasks and the last event time to avoid judging task failure based only on the time spent on the page.\n\n## Model connection failed\n\nCheck Base URL, protocol, model name, key, and model agent. 401 or 403 checks the authentication first, 404 checks the address and model, 429 checks the quota and current limit, and 413 checks the context. Handle errors according to actual service.\n\n[Retry and Failover](/help/?topic=llm-retry)\n\n## No traffic\n\nVerify that the request was actually executed, checking capture switches, logging agents, task channels, tool agent support, and current filtering. The browser screen or tool text alone cannot prove that the traffic has been included in the database.\n\n## No fingerprint or PoC results\n\nFirst confirm that the task has obtained the response or page material, and then check the automatic identification, rule status and product matching conditions. No fingerprints does not mean no product, and no candidates does not mean no vulnerabilities.\n\n## The springboard is online but the target is unreachable\n\nThe fact that the connector is online only indicates that the connection is established. Check routing, firewalls, service ports, authentication and operating permissions for each hop, and confirm that the task has been bound to the correct channel.\n\n## Report or missing link\n\nCheck whether the findings have been stored in the database, whether the exploration nodes and evidence are associated, and whether the report has been generated or needs to be updated. When historical data lacks correlation, evidence cannot be supplemented by color or page switching alone."
+  }
+]

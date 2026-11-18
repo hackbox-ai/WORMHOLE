@@ -1,0 +1,372 @@
+.path-workspace {
+  --path-surface: var(--card);
+  --path-ink: var(--foreground);
+  --path-muted: var(--muted-foreground);
+  --path-edge: color-mix(in oklab, var(--foreground) 30%, var(--card));
+  --path-grid: color-mix(in oklab, var(--foreground) 7%, var(--card));
+  /* Explicit theme values also survive static CSS compilation. */
+  --path-risk: #c0464d;
+  --path-running: #557fa8;
+  --path-done: #5b8170;
+  --path-waiting: #a0804f;
+  background: color-mix(in oklab, var(--background) 92%, var(--card));
+  color: var(--path-ink);
+}
+.dark .path-workspace {
+  --path-risk: #ed8b92;
+  --path-running: #8eb8df;
+  --path-done: #9cc3ad;
+  --path-waiting: #cfb27b;
+}
+.path-workspace .path-canvas {
+  background: transparent;
+  color: var(--path-ink);
+}
+.path-workspace .path-node {
+  max-height: none;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+  border-radius: 13px;
+  background: color-mix(in oklab, var(--card) 94%, var(--background));
+  color: var(--path-ink);
+  box-shadow: 0 4px 18px -13px color-mix(in oklab, var(--foreground) 28%, transparent);
+  transition:
+    border-color 0.24s,
+    background-color 0.24s,
+    box-shadow 0.24s;
+}
+.path-workspace .path-node[data-kind="begin"],
+.path-workspace .path-node[data-kind="task"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.path-workspace .path-node[data-kind="goal"],
+.path-workspace .path-node[data-kind="digest"] {
+  box-shadow: 0 7px 24px -16px color-mix(in oklab, var(--foreground) 34%, transparent);
+}
+.path-workspace .path-node[data-kind="intent"] {
+  background: color-mix(in oklab, var(--card) 78%, var(--background));
+  border-color: color-mix(in oklab, var(--border) 70%, transparent);
+  box-shadow: none;
+}
+.path-workspace .path-node[data-kind="fact"] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.path-workspace .path-node[data-kind="hint"] {
+  background: color-mix(in oklab, var(--path-accent) 5%, var(--card));
+}
+.path-workspace .path-node-meta {
+  margin-bottom: 8px;
+  color: var(--path-muted);
+  font-size: 11px;
+}
+.path-workspace .path-node-meta > .font-mono {
+  opacity: 0.75;
+  font-size: 10px;
+}
+.path-workspace .path-node-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.6;
+}
+.path-workspace .path-node[data-kind="goal"] .path-node-title,
+.path-workspace .path-node[data-kind="finding"] .path-node-title {
+  font-size: 14px;
+}
+.path-workspace .path-node-fields {
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.path-workspace .path-node-fields dt {
+  color: var(--path-muted);
+}
+.path-workspace .path-node-fields dd {
+  color: color-mix(in oklab, var(--path-ink) 76%, var(--card));
+}
+.path-workspace .path-node-footer {
+  border-top: 0;
+  margin-top: 11px;
+  padding-top: 0;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--path-muted);
+}
+.path-workspace .path-node-status {
+  background: color-mix(in oklab, var(--foreground) 3%, transparent) !important;
+  border-color: transparent !important;
+  color: var(--path-muted) !important;
+}
+.path-workspace .path-node-status > span {
+  background: var(--path-muted) !important;
+}
+.path-workspace .path-node[data-state="running"] .path-node-status {
+  color: var(--path-running) !important;
+}
+.path-workspace .path-node[data-state="running"] .path-node-status > span {
+  background: var(--path-running) !important;
+}
+.path-workspace .path-node[data-state="done"] .path-node-status > span,
+.path-workspace .path-node[data-state="met"] .path-node-status > span {
+  background: var(--path-done) !important;
+}
+.path-workspace .path-node[data-state="blocked"] .path-node-status > span {
+  background: var(--path-waiting) !important;
+}
+.path-workspace .path-node[data-state="failed"] .path-node-status > span {
+  background: var(--path-risk) !important;
+}
+.path-workspace .path-node-live {
+  background: color-mix(in oklab, var(--path-running) 6%, var(--card));
+  border-color: color-mix(in oklab, var(--path-running) 43%, var(--card));
+  box-shadow: 0 4px 20px -12px color-mix(in oklab, var(--path-running) 33%, transparent);
+}
+/* Highlight findings; intermediate nodes retain their normal appearance. */
+.path-workspace .path-node.path-node-finding {
+  background: color-mix(in oklab, var(--path-risk) 14%, var(--card));
+  border-color: color-mix(in oklab, var(--path-risk) 82%, var(--card));
+  border-left: 3px solid var(--path-risk);
+  box-shadow: 0 7px 22px -15px color-mix(in oklab, var(--path-risk) 35%, transparent);
+}
+.path-workspace .path-node.path-node-finding:hover {
+  border-color: var(--path-risk);
+}
+.path-workspace .path-node.path-node-finding.path-node-selected {
+  border-color: var(--path-risk);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--path-risk) 20%, transparent);
+}
+.path-workspace .path-finding-legend {
+  color: var(--path-risk);
+}
+.path-workspace .path-finding-legend::before {
+  background: var(--path-risk);
+}
+.path-workspace .path-node-selected {
+  border-color: var(--path-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--path-accent) 13%, transparent);
+}
+.path-workspace .path-node-update-label {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in oklab, var(--path-running) 10%, transparent);
+  color: var(--path-running);
+}
+.path-workspace .path-branch-toggle {
+  border-radius: 5px;
+  padding: 2px 3px;
+}
+.path-workspace .path-branch-toggle:hover {
+  background: var(--muted);
+}
+.path-workspace .react-flow__handle {
+  background: var(--path-surface) !important;
+  border-color: var(--path-edge) !important;
+  opacity: 0.65;
+}
+.path-workspace .react-flow__node {
+  transition: opacity 0.24s;
+}
+.path-workspace .react-flow__edge path {
+  transition:
+    stroke 0.24s,
+    opacity 0.24s;
+}
+.path-workspace .path-edge-label {
+  position: absolute;
+  pointer-events: none;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--background) 86%, transparent);
+  color: var(--path-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.path-workspace .path-legend {
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  color: var(--path-muted);
+  border-color: var(--border);
+  box-shadow: 0 5px 20px -16px color-mix(in oklab, var(--foreground) 25%, transparent);
+}
+.path-workspace .path-legend p {
+  color: var(--path-muted);
+}
+.path-workspace .path-controls.react-flow__controls button {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+.path-workspace .path-controls.react-flow__controls button:hover {
+  background: var(--muted) !important;
+}
+.path-workspace .path-controls.react-flow__controls svg {
+  fill: var(--path-muted) !important;
+}
+.path-workspace .react-flow__minimap {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+.path-workspace .react-flow__minimap-mask {
+  fill: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.path-workspace .path-finding-legend {
+  color: var(--path-risk) !important;
+}
+.path-workspace .path-finding-legend::before {
+  background: var(--path-risk);
+}
+.path-workspace .path-toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.path-workspace .path-runtime-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  font-size: 11px;
+  color: var(--path-muted);
+}
+.path-workspace .path-runtime-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.path-workspace .path-runtime-state[data-live="true"] {
+  color: var(--path-running);
+}
+.path-workspace .path-runtime-announcement {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.path-workspace .path-runtime-history {
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
+  z-index: 15;
+}
+.path-workspace .path-runtime-history summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.path-workspace .path-runtime-history > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 9px);
+  width: min(350px, 80vw);
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 8px 26px -15px color-mix(in oklab, var(--foreground) 35%, transparent);
+}
+.path-workspace .path-runtime-history button {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 7px;
+  text-align: left;
+  border-radius: 6px;
+}
+.path-workspace .path-runtime-history button:hover {
+  background: var(--accent);
+}
+.path-workspace .path-runtime-history time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.path-workspace .path-runtime-history span {
+  overflow-wrap: anywhere;
+}
+.path-sync-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+.path-sync-notice button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.path-workspace .path-node-entering {
+  animation: path-node-arrive 0.38s cubic-bezier(0.18, 0.65, 0.25, 1) both;
+}
+.path-workspace .path-node-updated {
+  animation: path-node-notice 1.4s ease-out;
+}
+@keyframes path-node-arrive {
+  from {
+    opacity: 0.1;
+    transform: translateX(-9px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@keyframes path-node-notice {
+  from {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--path-running) 16%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.path-workspace[data-motion="off"] .path-node,
+.path-workspace[data-motion="off"] .react-flow__node,
+.path-workspace[data-motion="off"] .react-flow__edge path {
+  animation: none !important;
+  transition: none !important;
+}
+@media (hover: hover) {
+  .path-workspace .path-node:hover {
+    border-color: color-mix(in oklab, var(--path-accent) 40%, var(--border));
+  }
+}
+@media (max-width: 767px) {
+  .path-workspace .path-workspace-toolbar {
+    align-items: flex-start;
+  }
+  .path-workspace .path-toolbar-actions {
+    justify-content: flex-start;
+  }
+  .path-workspace .path-runtime-strip {
+    padding: 7px 10px;
+    gap: 5px 10px;
+  }
+  .path-workspace .path-runtime-announcement {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .path-workspace .path-node,
+  .path-workspace .react-flow__node,
+  .path-workspace .react-flow__edge path {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.path-workspace .react-flow__background {
+  opacity: 0.35;
+}
+
+.path-workspace .path-node-fields dt { width: 4.5em; white-space: nowrap; }

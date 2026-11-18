@@ -1,0 +1,13 @@
+# New discovery reminder in the site
+
+After the new findings of the task are submitted to the database, a 300px reminder card will be displayed in the lower right corner of all logged in pages and will disappear in 7.5 seconds. Continuously discover the number of merges; the sidebar bell retains the last 100 reminders and unread status of the current browser. Click on an individual item to enter discovery details.
+
+Site switches, volume, and ring level in notification settings are instantly saved to the current browser, independent of external notification channels. The sound is turned off by default, and the user needs to click to turn it on or listen to it to activate the browser audio; it will automatically ring at most once within 8 seconds. There is no system notification permission request.
+
+`0070_finding_alerts.sql`writes to the lightweight event table in the same transaction as findings INSERT, containing only new findings with task_id. The history is not backfilled and no new events are issued for UPDATE. Best-effort failure of the original external notification outbox will not affect this reminder link.
+
+`GET /api/alerts/findings`is protected by existing login authentication and the response is not cached. The first read only establishes the baseline. Subsequent PostgreSQL snapshot cursors carrying HMAC signatures have 50 entries per page; paging fixed upper bound snapshots, and the next round of reading will continue to capture delayed submissions to prevent simple auto-increment ID cursors from missing transactions with earlier assigned IDs and later submissions. Stale cursors silently rebase.
+
+The front-end main layout mounts FindingAlertProvider and reads it every 2.5 seconds. Under the same browser account, select a page to read and ring through the localStorage lease, and other tab pages will be synchronized with unread and prompts; the 7-second lease can be taken over when the lease expires. Reminder that reading does not create tasks or adjust models. When browser storage is unavailable, the current page memory is returned; cross-tab coordination relies on browser storage.
+
+Verification: Standalone database regression covers commit, rollback, delayed commit, fixed snapshot paging, authentication, external outbox failure, and client deduplication and settings recovery. Quarantine sites are discovered through actual FindingsService.record registration, browser verification jumps, read synchronization, refresh without replay, merge prompts, and single-tab bells. Web Audio validation checks the audio context and oscillator playback calls and is not equivalent to human listening.

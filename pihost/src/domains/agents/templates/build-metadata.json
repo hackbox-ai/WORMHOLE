@@ -1,0 +1,10 @@
+{
+  "goVersion": "go version go1.26.11 linux/amd64",
+  "sourceReference": "WORMHOLE prompt renderer; Go standard text/template",
+  "runtime": "Node worker_threads + WASM; no Go executable required",
+  "sha256": {
+    "go-template.go": "5e661b767177744b6cb08927cb4d68cffc9ef71f522ca01ecc4034d49f28bd2f",
+    "template.wasm": "1bc31804d34d50583e4fb007270bb092b0fd31d1468e07d3ec54fe3ada3f67e0",
+    "wasm_exec.cjs": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14"
+  }
+}
