@@ -9,3 +9,5 @@
 Dark surfaces use the light wordmark; light surfaces use the dark wordmark.
 
 The background was generated with the built-in imagegen tool. See `docs/cosmic-background.md` at the repository root for the asset prompt and usage notes.
+
+The repository README uses transparent PNG exports in `docs/assets/logo-on-dark.png` and `docs/assets/logo-on-light.png` for image-preview compatibility. They are rendered from the corresponding SVG wordmarks at 1510 × 560 pixels, with alpha preserved.

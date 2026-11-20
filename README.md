@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="web/public/brand/logo-light.svg" />
-    <img src="web/public/brand/logo.svg" alt="WORMHOLE" width="420" />
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-on-dark.png" />
+    <img src="docs/assets/logo-on-light.png" alt="WORMHOLE" width="420" />
   </picture>
 </p>
 
